@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { RetroGrid } from "@/components/magicui/retro-grid";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Shield, Rocket, ChartBar } from "lucide-react";
+import { Sparkles, Shield, Rocket, ChartBar, ArrowRight } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
@@ -25,6 +25,15 @@ export default function Home() {
       description: "Track your investment performance live"
     }
   ];
+
+  // Add error boundaries around router pushes
+  const handleNavigation = (path: string) => {
+    try {
+      router.push(path);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
 
   return (
     <div className="relative min-h-screen w-full bg-black overflow-hidden">
@@ -54,13 +63,13 @@ export default function Home() {
             <Button 
               variant="ghost" 
               className="text-white hover:text-black hover:bg-white/90 transition-all duration-300"
-              onClick={() => router.push('/login')}
+              onClick={() => handleNavigation('/login')}
             >
               Log in
             </Button>
             <Button 
               className="bg-white text-black hover:bg-gray-100 transition-all duration-300"
-              onClick={() => router.push('/signup')}
+              onClick={() => handleNavigation('/signup')}
             >
               Sign up
             </Button>
@@ -118,6 +127,21 @@ export default function Home() {
             >
               Where Innovation Meets Investment
             </motion.p>
+
+            {/* Make in India line */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="text-lg md:text-xl font-medium text-white"
+            >
+              Support{" "}
+              <span className="text-[#FF9933]">#Ma</span>
+              <span className="text-[#FFFFFF]">ke</span>
+              <span className="text-[#138808]">In</span>
+              <span className="text-[#0cb1cf]">India</span>
+              {" "}by Investing today!
+            </motion.p>
           </div>
 
           {/* Features Grid */}
@@ -151,7 +175,7 @@ export default function Home() {
           >
             <Button 
               className="bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:opacity-90 px-8 py-6 text-lg rounded-full group transition-all duration-300"
-              onClick={() => router.push('/signup')}
+              onClick={() => handleNavigation('/signup')}
             >
               Get Started for free
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
