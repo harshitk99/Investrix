@@ -1,101 +1,173 @@
-import Image from "next/image";
+"use client";
+import { Button } from "@/components/ui/button";
+import { RetroGrid } from "@/components/magicui/retro-grid";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { ArrowRight, Sparkles, Shield, Rocket, ChartBar } from "lucide-react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const router = useRouter();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const features = [
+    {
+      icon: <Sparkles className="w-6 h-6" />,
+      title: "Smart Investments",
+      description: "AI-powered matching with verified investors"
+    },
+    {
+      icon: <Shield className="w-6 h-6" />,
+      title: "Secure Platform",
+      description: "Enterprise-grade security for your investments"
+    },
+    {
+      icon: <ChartBar className="w-6 h-6" />,
+      title: "Real-time Analytics",
+      description: "Track your investment performance live"
+    }
+  ];
+
+  return (
+    <div className="relative min-h-screen w-full bg-black overflow-hidden">
+      {/* Animated Background Grid */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ duration: 1 }}
+        className="absolute inset-0 -z-10"
+      >
+        <RetroGrid className="stroke-white" />
+      </motion.div>
+      <RetroGrid className="stroke-white opacity-0.9 " />
+      {/* Navigation */}
+      <motion.nav 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="fixed top-0 w-full z-50 px-6 py-4 backdrop-blur-sm border-b border-white/10"
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Rocket className="w-8 h-8 text-white" />
+            <span className="text-white text-xl font-medium">Investrix</span>
+          </div>
+          <div className="flex gap-4">
+            <Button 
+              variant="ghost" 
+              className="text-white hover:text-black hover:bg-white/90 transition-all duration-300"
+              onClick={() => router.push('/login')}
+            >
+              Log in
+            </Button>
+            <Button 
+              className="bg-white text-black hover:bg-gray-100 transition-all duration-300"
+              onClick={() => router.push('/signup')}
+            >
+              Sign up
+            </Button>
+          </div>
         </div>
+      </motion.nav>
+
+      {/* Main Content */}
+      <main className="relative flex min-h-screen flex-col items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative z-10 max-w-5xl text-center space-y-8"
+        >
+          {/* Main Heading */}
+          <div className="space-y-6">
+            <div className="relative inline-block">
+              <motion.h1 
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.5 }}
+                className="text-7xl md:text-8xl font-bold tracking-tight"
+              >
+                <span className="relative">
+                  <span className="text-white">Invest</span>
+                  {/* Animated underline for "Invest" */}
+                  <motion.div
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{
+                      duration: 1,
+                      delay: 0.5,
+                      ease: "easeInOut",
+                      repeat: Infinity,
+                      repeatType: "reverse",
+                      repeatDelay: 0.5
+                    }}
+                    className="absolute bottom-2 left-0 w-full h-0.5 origin-left "
+                    style={{
+                      background: "linear-gradient(90deg, #22c55e, #10b981, #22c55e)",
+                      backgroundSize: "200% 100%",
+                      animation: "gradientMove 2s linear infinite"
+                    }}
+                  />
+                </span>
+                <span className="text-white">rix</span>
+              </motion.h1>
+            </div>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-xl md:text-2xl text-gray-400"
+            >
+              Where Innovation Meets Investment
+            </motion.p>
+          </div>
+
+          {/* Features Grid */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12"
+          >
+            {features.map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 + 0.5 }}
+                className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-white/20 transition-all duration-300"
+              >
+                <div className="text-white mb-4">{feature.icon}</div>
+                <h3 className="text-white text-lg font-medium mb-2">{feature.title}</h3>
+                <p className="text-gray-400 text-sm">{feature.description}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* CTA Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1 }}
+            className="mt-12"
+          >
+            <Button 
+              className="bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:opacity-90 px-8 py-6 text-lg rounded-full group transition-all duration-300"
+              onClick={() => router.push('/signup')}
+            >
+              Get Started for free
+              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </motion.div>
+        </motion.div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      {/* Floating Elements */}
+      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-green-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+      <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-emerald-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+      <div className="absolute bottom-1/4 left-1/3 w-72 h-72 bg-green-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
+
+      {/* Background Gradients */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
+      <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-black to-transparent" />
     </div>
   );
 }
