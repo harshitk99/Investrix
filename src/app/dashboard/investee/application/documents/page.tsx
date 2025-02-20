@@ -3,15 +3,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
-import { toast } from 'react-hot-toast';
-import { onAuthStateChanged } from 'firebase/auth';
-import { getDocs, collection, updateDoc, DocumentSnapshot } from 'firebase/firestore';
-import { auth, db } from '@/app/firebase';
+import { toast } from "react-hot-toast";
+import { onAuthStateChanged } from "firebase/auth";
+import { getDocs, collection, updateDoc, DocumentSnapshot } from "firebase/firestore";
+import { auth, db } from "@/app/firebase";
 import { useEdgeStore } from "@/lib/edgestore";
 
 interface DocumentStatus {
   file: File | null;
-  status: 'idle' | 'validating' | 'success' | 'error';
+  status: "idle" | "validating" | "success" | "error";
   url: string;
 }
 
@@ -20,23 +20,47 @@ export default function DocumentUpload() {
   const searchParams = useSearchParams();
   const applicationId = searchParams.get("id");
   const userId = searchParams.get("userId");
-  
+
   const [loggedInUser, setLoggedInUser] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { edgestore } = useEdgeStore();
 
   const [documents, setDocuments] = useState<Record<string, DocumentStatus>>({
-    identityProof: { file: null, status: 'idle', url: '' },
-    bankStatements: { file: null, status: 'idle', url: '' },
-    taxReturns: { file: null, status: 'idle', url: '' },
-    addressProof: { file: null, status: 'idle', url: '' },
+    identityProof: { file: null, status: "idle", url: "" },
+    bankStatements: { file: null, status: "idle", url: "" },
+    taxReturns: { file: null, status: "idle", url: "" },
+    addressProof: { file: null, status: "idle", url: "" },
   });
 
   const [video, setVideo] = useState<File | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
-  const [videoStatus, setVideoStatus] = useState<'idle' | 'validating' | 'success' | 'error'>('idle');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [videoStatus, setVideoStatus] = useState<"idle" | "validating" | "success" | "error">("idle");
+  const [videoUrl, setVideoUrl] = useState("");
+
+  // Tags state
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([
+    "Technology",
+    "Manufacturing",
+    "Healthcare",
+    "Agribusiness",
+    "Renewable-Energy",
+    "Education",
+    "E-commerce",
+    "Infrastructure",
+    "Financial-Services",
+    "Consumer-Goods",
+    "Artisanal-and-Handicrafts",
+    "Sustainable-and-Social-Enterprises",
+    "Green Buildings",
+    "Sustainable Agriculture",
+    "Sustainable Forestry",
+    "Green Transportation",
+    "Waste Management",
+    "Recycling",
+  ]);
+  const [customTag, setCustomTag] = useState("");
 
   // Authentication check
   useEffect(() => {
@@ -56,7 +80,7 @@ export default function DocumentUpload() {
 
   const validateFile = async (file: File, type: string): Promise<boolean> => {
     // For documents
-    if (type !== 'video') {
+    if (type !== "video") {
       // Validate file size (max 5MB for documents)
       if (file.size > 5 * 1024 * 1024) {
         toast.error(`File size should be less than 5MB`);
@@ -64,14 +88,13 @@ export default function DocumentUpload() {
       }
 
       // Validate file type
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
       if (!allowedTypes.includes(file.type)) {
         toast.error("Only PDF, JPEG, and PNG files are allowed");
         return false;
       }
-    } 
-    // For video
-    else {
+    } else {
+      // For video
       // Validate video size (max 50MB)
       if (file.size > 50 * 1024 * 1024) {
         toast.error("Video size should be less than 50MB");
@@ -79,7 +102,7 @@ export default function DocumentUpload() {
       }
 
       // Validate video type
-      const allowedTypes = ['video/mp4', 'video/quicktime'];
+      const allowedTypes = ["video/mp4", "video/quicktime"];
       if (!allowedTypes.includes(file.type)) {
         toast.error("Only MP4 and MOV formats are allowed");
         return false;
@@ -93,24 +116,24 @@ export default function DocumentUpload() {
     if (!file) return;
 
     // Update state to show validating
-    setDocuments(prev => ({
+    setDocuments((prev) => ({
       ...prev,
       [documentId]: {
         ...prev[documentId],
         file,
-        status: 'validating'
-      }
+        status: "validating",
+      },
     }));
 
     // Validate the file
-    const isValid = await validateFile(file, 'document');
+    const isValid = await validateFile(file, "document");
     if (!isValid) {
-      setDocuments(prev => ({
+      setDocuments((prev) => ({
         ...prev,
         [documentId]: {
           ...prev[documentId],
-          status: 'error'
-        }
+          status: "error",
+        },
       }));
       return;
     }
@@ -118,9 +141,9 @@ export default function DocumentUpload() {
     try {
       if (!edgestore) {
         toast.error("Upload service unavailable");
-        setDocuments(prev => ({
+        setDocuments((prev) => ({
           ...prev,
-          [documentId]: { ...prev[documentId], status: 'error' }
+          [documentId]: { ...prev[documentId], status: "error" },
         }));
         return;
       }
@@ -134,35 +157,39 @@ export default function DocumentUpload() {
       });
 
       // Update state with success
-      setDocuments(prev => ({
+      setDocuments((prev) => ({
         ...prev,
         [documentId]: {
           file,
-          status: 'success',
-          url: res.url
-        }
+          status: "success",
+          url: res.url,
+        },
       }));
-      toast.success(`${documentId.replace(/([A-Z])/g, ' $1').trim()} uploaded successfully!`);
+      toast.success(
+        `${documentId.replace(/([A-Z])/g, " $1").trim()} uploaded successfully!`
+      );
     } catch (error) {
       console.error(`Error uploading ${documentId}:`, error);
-      setDocuments(prev => ({
+      setDocuments((prev) => ({
         ...prev,
-        [documentId]: { ...prev[documentId], status: 'error' }
+        [documentId]: { ...prev[documentId], status: "error" },
       }));
-      toast.error(`Failed to upload ${documentId.replace(/([A-Z])/g, ' $1').trim()}`);
+      toast.error(
+        `Failed to upload ${documentId.replace(/([A-Z])/g, " $1").trim()}`
+      );
     }
   };
 
   const handleVideoUpload = async (file: File | null) => {
     if (!file) return;
 
-    setVideoStatus('validating');
+    setVideoStatus("validating");
     setVideoError(null);
 
     // Validate the video
-    const isValid = await validateFile(file, 'video');
+    const isValid = await validateFile(file, "video");
     if (!isValid) {
-      setVideoStatus('error');
+      setVideoStatus("error");
       return;
     }
 
@@ -180,12 +207,12 @@ export default function DocumentUpload() {
       });
 
       setVideo(file);
-      setVideoStatus('success');
+      setVideoStatus("success");
       setVideoUrl(res.url);
       toast.success("Pitch video uploaded successfully!");
     } catch (error) {
       console.error("Error uploading video:", error);
-      setVideoStatus('error');
+      setVideoStatus("error");
       setVideoError("Failed to upload video. Please try again.");
     }
   };
@@ -195,21 +222,28 @@ export default function DocumentUpload() {
     e.stopPropagation();
   };
 
-  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>, documentId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>, documentId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const droppedFile = e.dataTransfer.files[0];
-    if (!droppedFile) return;
-    
-    await handleFileChange(documentId, droppedFile);
-  }, []);
+      const droppedFile = e.dataTransfer.files[0];
+      if (!droppedFile) return;
+
+      await handleFileChange(documentId, droppedFile);
+    },
+    []
+  );
 
   const handleSubmit = async () => {
-    // Validate all required documents are uploaded
-    const allDocumentsUploaded = Object.values(documents).every(doc => doc.status === 'success');
-    if (!allDocumentsUploaded || videoStatus !== 'success') {
-      toast.error("Please upload all required documents and pitch video");
+    // Validate that all required documents, video, and at least one tag are provided
+    const allDocumentsUploaded = Object.values(documents).every(
+      (doc) => doc.status === "success"
+    );
+    if (!allDocumentsUploaded || videoStatus !== "success" || selectedTags.length === 0) {
+      toast.error(
+        "Please upload all required documents, pitch video, and select at least one tag"
+      );
       return;
     }
 
@@ -230,7 +264,7 @@ export default function DocumentUpload() {
       const querySnapshot = await getDocs(applicationsRef);
       let applicationDoc: DocumentSnapshot<any> | null = null;
 
-      querySnapshot.forEach(doc => {
+      querySnapshot.forEach((doc) => {
         const data = doc.data();
         if (data.id.toString() === applicationId) {
           applicationDoc = doc;
@@ -240,18 +274,15 @@ export default function DocumentUpload() {
       if (!applicationDoc) {
         throw new Error("Application not found");
       }
-
-      if (!applicationDoc) {
-        throw new Error("Application not found");
-      }
       //@ts-ignore
       await updateDoc(applicationDoc.ref as any, {
         documents: documentUrls,
-        videoLink: videoUrl
+        videoLink: videoUrl,
+        tags: selectedTags,
       });
 
       toast.success("Application submitted successfully!");
-      router.push(`/dashbaord/investee/viewapplication?id=${applicationId}`);
+      router.push(`/dashboard/investee/viewapplication?id=${applicationId}`);
     } catch (error) {
       console.error("Error submitting application:", error);
       toast.error("Failed to submit application. Please try again.");
@@ -264,8 +295,8 @@ export default function DocumentUpload() {
     <div className="min-h-screen bg-black text-white">
       <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
         <span className="text-xl font-medium">Investrix</span>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="text-white bg-black hover:bg-white hover:text-black"
           onClick={() => router.back()}
         >
@@ -284,24 +315,32 @@ export default function DocumentUpload() {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="font-medium capitalize">
-                      {docId.replace(/([A-Z])/g, ' $1').trim()}
+                      {docId.replace(/([A-Z])/g, " $1").trim()}
                     </h3>
                     <p className="text-sm text-gray-400">
                       PDF, JPEG or PNG (max. 5MB)
                     </p>
                   </div>
-                  {status.status === 'success' && <CheckCircle className="text-green-500 h-5 w-5" />}
-                  {status.status === 'validating' && <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />}
-                  {status.status === 'error' && <AlertCircle className="text-red-500 h-5 w-5" />}
+                  {status.status === "success" && (
+                    <CheckCircle className="text-green-500 h-5 w-5" />
+                  )}
+                  {status.status === "validating" && (
+                    <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />
+                  )}
+                  {status.status === "error" && (
+                    <AlertCircle className="text-red-500 h-5 w-5" />
+                  )}
                 </div>
 
-                <div 
+                <div
                   className={`mt-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
-                    ${status.status === 'idle' ? 'border-gray-500 hover:border-white' : ''}
-                    ${status.status === 'validating' ? 'border-yellow-500' : ''}
-                    ${status.status === 'success' ? 'border-green-500' : ''}
-                    ${status.status === 'error' ? 'border-red-500' : ''}`
-                  }
+                    ${status.status === "idle"
+                      ? "border-gray-500 hover:border-white"
+                      : ""
+                    }
+                    ${status.status === "validating" ? "border-yellow-500" : ""}
+                    ${status.status === "success" ? "border-green-500" : ""}
+                    ${status.status === "error" ? "border-red-500" : ""}`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, docId)}
                 >
@@ -310,23 +349,26 @@ export default function DocumentUpload() {
                     id={docId}
                     className="hidden"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => handleFileChange(docId, e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      handleFileChange(docId, e.target.files?.[0] || null)
+                    }
                   />
                   <label
                     htmlFor={docId}
                     className="flex flex-col items-center justify-center gap-2 cursor-pointer"
                   >
                     <Upload className="h-6 w-6" />
-                    {status.file ? 'Change File' : 'Drag & drop or click to upload'}
+                    {status.file ? "Change File" : "Drag & drop or click to upload"}
                   </label>
                   {status.file && (
-                    <p className="text-sm text-gray-400 mt-2">{status.file.name}</p>
+                    <p className="text-sm text-gray-400 mt-2">
+                      {status.file.name}
+                    </p>
                   )}
                 </div>
               </div>
             ))}
           </div>
-
           {/* Video Upload Section */}
           <div className="space-y-6">
             <div className="p-4 border border-[#333333] rounded-lg">
@@ -337,32 +379,42 @@ export default function DocumentUpload() {
                     Upload a short video (max. 50MB) pitching your business and loan requirement
                   </p>
                 </div>
-                {videoStatus === 'success' && <CheckCircle className="text-green-500 h-5 w-5" />}
-                {videoStatus === 'validating' && <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />}
-                {videoStatus === 'error' && <AlertCircle className="text-red-500 h-5 w-5" />}
+                {videoStatus === "success" && (
+                  <CheckCircle className="text-green-500 h-5 w-5" />
+                )}
+                {videoStatus === "validating" && (
+                  <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />
+                )}
+                {videoStatus === "error" && (
+                  <AlertCircle className="text-red-500 h-5 w-5" />
+                )}
               </div>
 
-              <div 
+              <div
                 className={`mt-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
-                  ${videoStatus === 'idle' ? 'border-gray-500 hover:border-white' : ''}
-                  ${videoStatus === 'validating' ? 'border-yellow-500' : ''}
-                  ${videoStatus === 'success' ? 'border-green-500' : ''}
-                  ${videoStatus === 'error' ? 'border-red-500' : ''}`
-                }
+                  ${videoStatus === "idle"
+                    ? "border-gray-500 hover:border-white"
+                    : ""
+                  }
+                  ${videoStatus === "validating" ? "border-yellow-500" : ""}
+                  ${videoStatus === "success" ? "border-green-500" : ""}
+                  ${videoStatus === "error" ? "border-red-500" : ""}`}
               >
                 <input
                   type="file"
                   id="pitchVideo"
                   className="hidden"
                   accept="video/mp4,video/quicktime"
-                  onChange={(e) => handleVideoUpload(e.target.files?.[0] || null)}
+                  onChange={(e) =>
+                    handleVideoUpload(e.target.files?.[0] || null)
+                  }
                 />
                 <label
                   htmlFor="pitchVideo"
                   className="flex flex-col items-center justify-center gap-2 cursor-pointer"
                 >
                   <Upload className="h-6 w-6" />
-                  {video ? 'Change Video' : 'Drag & drop or click to upload'}
+                  {video ? "Change Video" : "Drag & drop or click to upload"}
                 </label>
                 {video && (
                   <p className="text-sm text-gray-400 mt-2">{video.name}</p>
@@ -372,7 +424,7 @@ export default function DocumentUpload() {
                 )}
               </div>
 
-              {video && videoStatus === 'success' && (
+              {video && videoStatus === "success" && (
                 <video
                   className="mt-4 w-full rounded-lg"
                   controls
@@ -380,7 +432,77 @@ export default function DocumentUpload() {
                 />
               )}
             </div>
+            {/* Tags Section */}
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold mb-4">Tags</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Select tags that best describe your business:
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTags((prev) => [...prev, tag]);
+                    setAvailableTags((prev) => prev.filter((t) => t !== tag));
+                  }}
+                  className="px-3 py-1 rounded-full text-sm bg-gray-700 hover:bg-gray-600"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={customTag}
+                onChange={(e) => setCustomTag(e.target.value)}
+                placeholder="Enter custom tag"
+                className="flex-1 px-3 py-2 border rounded-lg border-gray-600 bg-black text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (customTag.trim()) {
+                    setSelectedTags((prev) => [...prev, customTag.trim()]);
+                    setCustomTag("");
+                  }
+                }}
+                className="px-4 py-2 text-white bg-blue-800 rounded-lg"
+              >
+                Add
+              </button>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Selected Tags:</h3>
+              <div className="flex flex-wrap gap-2">
+                {selectedTags.map((tag, index) => (
+                  <div
+                    key={index}
+                    className="px-3 py-1 rounded-full text-sm bg-gray-800 text-white flex items-center gap-1"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTags((prev) =>
+                          prev.filter((t) => t !== tag)
+                        );
+                        setAvailableTags((prev) => [...prev, tag]);
+                      }}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+            </div>
           </div>
+          </div>
+          
         </div>
 
         {/* Submit Button */}
@@ -395,7 +517,12 @@ export default function DocumentUpload() {
           <Button
             className="bg-white text-black hover:bg-gray-200"
             onClick={handleSubmit}
-            disabled={isSubmitting || !Object.values(documents).every(doc => doc.status === 'success') || videoStatus !== 'success'}
+            disabled={
+              isSubmitting ||
+              !Object.values(documents).every((doc) => doc.status === "success") ||
+              videoStatus !== "success" ||
+              selectedTags.length === 0
+            }
           >
             {isSubmitting ? "Submitting..." : "Submit Application"}
           </Button>
