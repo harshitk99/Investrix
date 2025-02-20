@@ -6,6 +6,7 @@ import { auth } from '@/app/firebase';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
+import { Rocket } from 'lucide-react';
 
 const Navbar = () => {
   const [user, setUser] = useState(null);
@@ -33,7 +34,8 @@ const Navbar = () => {
 
   return (
     <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
-      <span className="text-xl font-medium">Investrix</span>
+      <Rocket className="w-8 h-8 text-white" />
+      <span className="text-white text-xl font-medium">Investrix</span>
       <div className="flex gap-4">
         {user ? (
           <Button variant="ghost" className="text-gray-300" onClick={handleSignOut}>Sign Out</Button>
