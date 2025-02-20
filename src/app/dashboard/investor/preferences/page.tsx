@@ -1,18 +1,37 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Leaf } from "lucide-react"; // Import leaf icon from lucide-react
+import { Leaf } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { doc, setDoc } from "firebase/firestore";
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/app/firebase';
+
+// Type definitions
+type Category = {
+  name: string;
+  sustainable: boolean;
+};
+
+type InvestorInfo = {
+  amount: string;
+  duration: string;
+  goals: string;
+};
 
 export default function Preferences() {
   const router = useRouter();
-  const [amount, setAmount] = useState("");
-  const [duration, setDuration] = useState("");
-  const [goals, setGoals] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [investorInfo, setInvestorInfo] = useState<InvestorInfo>({
+    amount: "",
+    duration: "",
+    goals: ""
+  });
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
 
-  // Define categories with sustainability flags
-  const categories = [
+  // Categories with sustainability flags
+  const categories: Category[] = [
     { name: "Technology", sustainable: false },
     { name: "Manufacturing", sustainable: false },
     { name: "Healthcare", sustainable: false },
@@ -27,6 +46,19 @@ export default function Preferences() {
     { name: "Sustainable-and-Social-Enterprises", sustainable: true }
   ];
 
+  // Check authentication status
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
   const togglePreference = (category: string) => {
     setSelectedPreferences(prev =>
       prev.includes(category)
@@ -35,9 +67,28 @@ export default function Preferences() {
     );
   };
 
+  const handleSubmit = async () => {
+    const preferencesId = Math.floor(Math.random() * 1000000000);
+    try {
+      const preferenceData = {
+        preferencesId,
+        amountToInvest: investorInfo.amount,
+        investmentDuration: investorInfo.duration,
+        goals: investorInfo.goals,
+        preferences: selectedPreferences,
+        userId
+      };
+      
+      await setDoc(doc(db, "preferences", preferencesId.toString()), preferenceData);
+      router.push(`/dashboard/investor/recom/${preferencesId}`);
+    } catch (error) {
+      console.error("Error adding/updating document: ", error);
+      // You might want to add error handling UI here
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-6 relative">
-      {/* Back to Dashboard Button */}
       <Button
         onClick={() => router.push("/dashboard/investor")}
         className="absolute top-6 right-6 bg-white hover:bg-gray-200 text-black px-4 py-2 rounded-lg"
@@ -56,8 +107,8 @@ export default function Preferences() {
               <input
                 type="text"
                 placeholder="Enter amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={investorInfo.amount}
+                onChange={(e) => setInvestorInfo(prev => ({ ...prev, amount: e.target.value }))}
                 className="w-full bg-black border border-[#333333] rounded-lg p-3 text-white placeholder:text-gray-600 focus:border-white focus:ring-0 transition-colors"
               />
             </div>
@@ -67,8 +118,8 @@ export default function Preferences() {
               <input
                 type="text"
                 placeholder="e.g., 2 years"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                value={investorInfo.duration}
+                onChange={(e) => setInvestorInfo(prev => ({ ...prev, duration: e.target.value }))}
                 className="w-full bg-black border border-[#333333] rounded-lg p-3 text-white placeholder:text-gray-600 focus:border-white focus:ring-0 transition-colors"
               />
             </div>
@@ -77,8 +128,8 @@ export default function Preferences() {
               <label className="block text-gray-400 mb-2">Goals and Objectives</label>
               <textarea
                 placeholder="Describe your investment goals"
-                value={goals}
-                onChange={(e) => setGoals(e.target.value)}
+                value={investorInfo.goals}
+                onChange={(e) => setInvestorInfo(prev => ({ ...prev, goals: e.target.value }))}
                 className="w-full bg-black border border-[#333333] rounded-lg p-3 text-white placeholder:text-gray-600 focus:border-white focus:ring-0 transition-colors min-h-[150px]"
               />
             </div>
@@ -135,10 +186,7 @@ export default function Preferences() {
       <div className="max-w-6xl mx-auto mt-6">
         <Button 
           className="w-full bg-white text-black hover:bg-gray-200 py-6 text-lg rounded-xl"
-          onClick={() => {
-            // Handle submission
-            console.log({ amount, duration, goals, selectedPreferences });
-          }}
+          onClick={handleSubmit}
         >
           Submit Details
         </Button>

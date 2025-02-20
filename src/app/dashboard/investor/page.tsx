@@ -256,7 +256,7 @@ export default function InvestorDashboard() {
                     </Button>
                     <Button 
                       className="bg-white text-black hover:bg-gray-200"
-                      onClick={() => router.push(`/bidding/?id=${application.id}`)}
+                      onClick={() => router.push(`/dashboard/investor/bid/${application.id}`)}
                     >
                       Bid
                     </Button>

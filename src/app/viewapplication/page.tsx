@@ -373,7 +373,7 @@ export default function ApplicationView() {
         <div className="flex gap-4">
           <Button 
             className="flex-1 bg-white text-black hover:bg-gray-200 py-6 text-lg"
-            onClick={() => router.push(`/bidding/?id=${application.id}`)}
+            onClick={() => router.push(`/dashboard/investor/bid/${application.id}`)}
           >
             Place Bid
           </Button>
