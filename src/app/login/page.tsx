@@ -5,6 +5,9 @@ import { RetroGrid } from "@/components/magicui/retro-grid";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase";
+import toast from "react-hot-toast";
 import { 
   Rocket, 
   Mail, 
@@ -19,32 +22,51 @@ import {
 export default function Login() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<string>("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSignIn = async () => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setError("");
+  };
+
+  const validateForm = () => {
     if (!selectedRole) {
       setError("Please select a role before signing in.");
-      return;
+      return false;
     }
 
-    if (!email || !password) {
+    if (!formData.email || !formData.password) {
       setError("Please fill in all fields.");
-      return;
+      return false;
     }
+    return true;
+  };
 
-    setError("");
+  const handleSignIn = async () => {
+    if (!validateForm()) return;
+
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push(`/dashboard/${selectedRole}`);
-    } catch (error) {
-      setError("Failed to sign in. Please try again.");
+      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      toast.success("Sign in successful");
+      
+      // Route based on selected role
+      if (selectedRole === 'investor') {
+        router.push('/dashboard/investor');
+      } else if (selectedRole === 'investee') {
+        router.push('/dashboard/investee');
+      }
+    } catch (error: any) {
       console.error('Error signing in:', error);
+      setError(error.message || "Failed to sign in. Please try again.");
+      toast.error("Sign in failed");
     } finally {
       setIsLoading(false);
     }
@@ -201,9 +223,10 @@ export default function Login() {
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <Input
                   type="email"
+                  name="email"
                   placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleInputChange}
                   className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-400/30 focus:ring-0 rounded-xl"
                 />
               </div>
@@ -211,9 +234,10 @@ export default function Login() {
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <Input
                   type={showPassword ? "text" : "password"}
+                  name="password"
                   placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={handleInputChange}
                   className="h-12 pl-10 pr-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-400/30 focus:ring-0 rounded-xl"
                 />
                 <button
