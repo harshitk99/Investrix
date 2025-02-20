@@ -112,20 +112,13 @@ export default function InvesteeDashboard() {
       <div className="p-6">
         {/* Header Actions */}
         <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Investee Dashboard</h1>
           <Button 
             variant="outline" 
             className="border-white text-black hover:bg-white hover:text-black"
             onClick={() => router.push('/dashboard/investee/application')}
           >
             Create New Application
-          </Button>
-          <h1 className="text-2xl font-bold">Investee Dashboard</h1>
-          <Button 
-            variant="outline" 
-            className="border-white text-black hover:bg-white hover:text-black"
-            onClick={() => router.push('/dashboard/investee/profile')}
-          >
-            Company Profile
           </Button>
         </div>
 
