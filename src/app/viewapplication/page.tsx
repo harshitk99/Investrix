@@ -1,8 +1,12 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { db } from "@/app/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Download, Mail, Phone, X } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   AreaChart,
   Area,
@@ -20,45 +24,42 @@ import {
   Cell
 } from 'recharts';
 
-// Mock data with graphs data and contact information
-const company = {
-  id: "techstart",
-  companyName: "TechStart Solutions",
-  investedAmount: "50 APT",
-  inrValue: "₹38,868",
-  riskPotential: "Medium",
-  tenure: "12 months",
-  interestRate: 12,
-  status: "Active",
-  industry: "Technology",
-  description: "AI-powered customer service platform revolutionizing customer support with advanced machine learning algorithms.",
-  videoPitch: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-  foundingYear: "2021",
-  teamSize: "25",
-  revenue: "₹1.5 Cr",
-  location: "Bangalore",
-  contact: {
-    companyEmail: "info@techstart.com",
-    companyPhone: "+91 98765 43210",
-    ceoEmail: "sarah.johnson@techstart.com",
-    ctoEmail: "raj.patel@techstart.com"
-  },
-  keyMetrics: {
-    mrr: "₹12L",
-    customers: "50+",
-    growth: "150% YoY",
-    burnRate: "₹8L/month"
-  },
-  documents: [
-    { name: "Pitch Deck", size: "2.4 MB", type: "pdf" },
-    { name: "Financial Projections", size: "1.1 MB", type: "xlsx" },
-    { name: "Market Research", size: "3.7 MB", type: "pdf" }
-  ],
-  team: [
-    { name: "Sarah Johnson", role: "CEO & Founder" },
-    { name: "Raj Patel", role: "CTO" },
-    { name: "Maria Garcia", role: "Head of Sales" }
-  ],
+// Types
+interface Application {
+  id: string;
+  companyName: string;
+  businessType: string;
+  tags: Array<string | { tag: string; isSpecial: boolean }>;
+  loanPurpose: string;
+  yearsInOperation: number;
+  annualRevenue: number;
+  phone: string;
+  fundingStatus: string;
+  fundingReceived: string;
+  loanAmount: number;
+  loanAmountInINR: number;
+  pitch: string;
+  videoLink: string;
+  industry?: string;
+  status?: string;
+  description?: string;
+  contact?: {
+    companyEmail: string;
+    companyPhone: string;
+    ceoEmail: string;
+    ctoEmail: string;
+  };
+}
+
+interface ShowGraphs {
+  revenue: boolean;
+  customers: boolean;
+  market: boolean;
+  burnRate: boolean;
+}
+
+// Mock data for graphs (you might want to move this to a separate file)
+const mockGraphData = {
   revenueGrowth: [
     { month: 'Jan', revenue: 12 },
     { month: 'Feb', revenue: 19 },
@@ -90,12 +91,14 @@ const company = {
   ]
 };
 
-// Colors for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export default function ApplicationView() {
   const router = useRouter();
-  const [showGraphs, setShowGraphs] = useState({
+  const search = useSearchParams();
+  const applicationId = search.get("id");
+  const [application, setApplication] = useState<Application | null>(null);
+  const [showGraphs, setShowGraphs] = useState<ShowGraphs>({
     revenue: false,
     customers: false,
     market: false,
@@ -103,12 +106,49 @@ export default function ApplicationView() {
   });
   const [showContactCard, setShowContactCard] = useState(false);
 
-  const toggleGraph = (metric: keyof typeof showGraphs) => {
+  useEffect(() => {
+    const fetchApplication = async () => {
+      if (!applicationId) return;
+
+      try {
+        const appRef = doc(db, "applications", applicationId);
+        const appSnap = await getDoc(appRef);
+
+        if (appSnap.exists()) {
+          const appData = appSnap.data() as Application;
+          appData.loanAmountInINR = appData.loanAmount * 777.36;
+          setApplication(appData);
+          toast.success('Application found!');
+        } else {
+          toast.error("Application not found!");
+        }
+      } catch (error) {
+        console.error("Error fetching application:", error);
+        toast.error("Error fetching application!");
+      }
+    };
+
+    fetchApplication();
+  }, [applicationId]);
+
+  const toggleGraph = (metric: keyof ShowGraphs) => {
     setShowGraphs(prev => ({
       ...prev,
       [metric]: !prev[metric]
     }));
   };
+
+  if (!application) {
+    return (
+      <div className="min-h-screen bg-black text-white p-6 flex items-center justify-center">
+        <p className="text-xl">Loading application details...</p>
+      </div>
+    );
+  }
+
+  const hasSpecialTag = application.tags?.some(
+    (tag) => typeof tag === "object" && tag.isSpecial
+  );
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
@@ -125,16 +165,16 @@ export default function ApplicationView() {
         <div className="border border-[#333333] rounded-xl p-6 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{company.companyName}</h1>
-              <p className="text-gray-400 text-lg">{company.industry}</p>
+              <h1 className="text-3xl font-bold mb-2">{application.companyName}</h1>
+              <p className="text-gray-400 text-lg">{application.businessType}</p>
             </div>
-            <span className={`px-4 py-1 rounded-full text-sm ${
-              company.status === 'Active' ? 'bg-green-500' : 'bg-yellow-500'
-            } text-black font-medium`}>
-              {company.status}
-            </span>
+            {hasSpecialTag && (
+              <div className="px-4 py-1 rounded-full bg-green-500 text-black font-medium text-sm">
+                Eco-Friendly
+              </div>
+            )}
           </div>
-          <p className="text-gray-400 text-lg">{company.description}</p>
+          <p className="text-gray-400 text-lg">{application.pitch}</p>
         </div>
 
         {/* Video Pitch Section */}
@@ -142,15 +182,16 @@ export default function ApplicationView() {
           <h2 className="text-xl font-bold mb-4">Company Pitch</h2>
           <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden">
             <iframe
-              src={company.videoPitch}
+              src={application.videoLink}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="absolute inset-0 w-full h-full"
             />
           </div>
         </div>
-                {/* Metrics & Analytics Section */}
-                <div className="border border-[#333333] rounded-xl p-6 mb-6">
+
+        {/* Metrics & Analytics Section - Using mock data for graphs */}
+        <div className="border border-[#333333] rounded-xl p-6 mb-6">
           <h2 className="text-xl font-bold mb-6">Metrics & Analytics</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -159,7 +200,7 @@ export default function ApplicationView() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-lg font-medium">Revenue Growth</h3>
-                  <p className="text-gray-400">Last 6 months: +275%</p>
+                  <p className="text-gray-400">Annual Revenue: ₹{application.annualRevenue}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -172,7 +213,7 @@ export default function ApplicationView() {
               {showGraphs.revenue && (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={company.revenueGrowth}>
+                    <AreaChart data={mockGraphData.revenueGrowth}>
                       <defs>
                         <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8}/>
@@ -208,7 +249,7 @@ export default function ApplicationView() {
               {showGraphs.customers && (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={company.customerGrowth}>
+                    <LineChart data={mockGraphData.customerGrowth}>
                       <XAxis dataKey="month" stroke="#666" />
                       <YAxis stroke="#666" />
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -240,7 +281,7 @@ export default function ApplicationView() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={company.marketDistribution}
+                        data={mockGraphData.marketDistribution}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -249,7 +290,7 @@ export default function ApplicationView() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {company.marketDistribution.map((entry, index) => (
+                        {mockGraphData.marketDistribution.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -278,7 +319,7 @@ export default function ApplicationView() {
               {showGraphs.burnRate && (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={company.burnRate}>
+                    <BarChart data={mockGraphData.burnRate}>
                       <XAxis dataKey="month" stroke="#666" />
                       <YAxis stroke="#666" />
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -306,40 +347,13 @@ export default function ApplicationView() {
               <h2 className="text-xl font-bold mb-6">Contact Information</h2>
               
               <div className="space-y-6">
-                {/* Company Contact */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-400">Company</h3>
                   <div className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-400">Phone</p>
-                      <p className="text-white">{company.contact.companyPhone}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm text-gray-400">Email</p>
-                      <p className="text-white">{company.contact.companyEmail}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Leadership Contacts */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-400">Leadership</h3>
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm text-gray-400">CEO Email</p>
-                      <p className="text-white">{company.contact.ceoEmail}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm text-gray-400">CTO Email</p>
-                      <p className="text-white">{company.contact.ctoEmail}</p>
+                      <p className="text-white">{application.phone}</p>
                     </div>
                   </div>
                 </div>
@@ -359,7 +373,7 @@ export default function ApplicationView() {
         <div className="flex gap-4">
           <Button 
             className="flex-1 bg-white text-black hover:bg-gray-200 py-6 text-lg"
-            onClick={() => router.push(`/dashboard/investor/bid/${company.id}`)}
+            onClick={() => router.push(`/bidding/?id=${application.id}`)}
           >
             Place Bid
           </Button>
@@ -375,11 +389,3 @@ export default function ApplicationView() {
     </div>
   );
 }
-
-// Helper component for displaying details
-const DetailRow = ({ label, value }: { label: string; value: string }) => (
-  <div>
-    <p className="text-gray-400 text-sm">{label}</p>
-    <p className="text-white font-medium">{value}</p>
-  </div>
-);
