@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { MessageCircle, X } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 export default function InvestorDashboard() {
   const router = useRouter();
@@ -49,14 +50,7 @@ const finalizedBids = [
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Navbar */}
-      <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
-        <span className="text-xl font-medium">Investrix</span>
-        <div className="flex gap-4">
-          <Button variant="ghost" className="text-gray-300 hover:text-white">Home</Button>
-          <Button variant="ghost" className="text-gray-300 hover:text-white">Sign Out</Button>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Content */}
       <div className="p-6">

@@ -65,7 +65,7 @@ export default function Login() {
       }
     } catch (error: any) {
       console.error('Error signing in:', error);
-      setError(error.message || "Failed to sign in. Please try again.");
+      setError("Failed to sign in. Please try again.");
       toast.error("Sign in failed");
     } finally {
       setIsLoading(false);
