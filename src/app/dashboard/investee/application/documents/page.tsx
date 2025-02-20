@@ -1,144 +1,262 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, MapPin, AlertCircle, CheckCircle } from "lucide-react";
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { Upload, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { toast } from 'react-hot-toast';
+import { onAuthStateChanged } from 'firebase/auth';
+import { getDocs, collection, updateDoc, DocumentSnapshot } from 'firebase/firestore';
+import { auth, db } from '@/app/firebase';
+import { useEdgeStore } from "@/lib/edgestore";
 
 interface DocumentStatus {
   file: File | null;
-  uploaded: boolean;
-  error: string | null;
-}
-
-interface Address {
-  lat: number;
-  lng: number;
-  formatted: string;
+  status: 'idle' | 'validating' | 'success' | 'error';
+  url: string;
 }
 
 export default function DocumentUpload() {
   const router = useRouter();
-  const [address, setAddress] = useState<Address | null>(null);
+  const searchParams = useSearchParams();
+  const applicationId = searchParams.get("id");
+  const userId = searchParams.get("userId");
+  
+  const [loggedInUser, setLoggedInUser] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { edgestore } = useEdgeStore();
 
   const [documents, setDocuments] = useState<Record<string, DocumentStatus>>({
-    identityProof: { file: null, uploaded: false, error: null },
-    bankStatements: { file: null, uploaded: false, error: null },
-    taxReturns: { file: null, uploaded: false, error: null },
-    addressProof: { file: null, uploaded: false, error: null },
+    identityProof: { file: null, status: 'idle', url: '' },
+    bankStatements: { file: null, status: 'idle', url: '' },
+    taxReturns: { file: null, status: 'idle', url: '' },
+    addressProof: { file: null, status: 'idle', url: '' },
   });
 
   const [video, setVideo] = useState<File | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<'idle' | 'validating' | 'success' | 'error'>('idle');
+  const [videoUrl, setVideoUrl] = useState('');
 
-  const handleFileChange = async (documentId: string, file: File | null) => {
-    if (file) {
+  // Authentication check
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setLoggedInUser(user.uid);
+        // If there's a userId in the URL and it doesn't match the logged-in user, redirect
+        if (userId && userId !== user.uid) {
+          toast.error("Unauthorized access");
+          router.push("/dashboard/investee");
+        }
+      } else {
+        router.push("/login");
+      }
+    });
+  }, [router, userId]);
+
+  const validateFile = async (file: File, type: string): Promise<boolean> => {
+    // For documents
+    if (type !== 'video') {
       // Validate file size (max 5MB for documents)
       if (file.size > 5 * 1024 * 1024) {
-        setDocuments(prev => ({
-          ...prev,
-          [documentId]: {
-            file: null,
-            uploaded: false,
-            error: "File size should be less than 5MB"
-          }
-        }));
-        return;
+        toast.error(`File size should be less than 5MB`);
+        return false;
       }
 
       // Validate file type
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
-        setDocuments(prev => ({
-          ...prev,
-          [documentId]: {
-            file: null,
-            uploaded: false,
-            error: "Only PDF, JPEG, and PNG files are allowed"
-          }
-        }));
-        return;
+        toast.error("Only PDF, JPEG, and PNG files are allowed");
+        return false;
       }
-
-      setDocuments(prev => ({
-        ...prev,
-        [documentId]: {
-          file,
-          uploaded: true,
-          error: null
-        }
-      }));
-
-      // If it's address proof, try to extract address and get coordinates
-      if (documentId === 'addressProof') {
-        // This is a mock function - you'd need to implement actual address extraction
-        await extractAddressAndUpdateMap(file);
-      }
-    }
-  };
-
-  const handleVideoUpload = (file: File | null) => {
-    if (file) {
+    } 
+    // For video
+    else {
       // Validate video size (max 50MB)
       if (file.size > 50 * 1024 * 1024) {
-        setVideoError("Video size should be less than 50MB");
-        return;
+        toast.error("Video size should be less than 50MB");
+        return false;
       }
 
       // Validate video type
       const allowedTypes = ['video/mp4', 'video/quicktime'];
       if (!allowedTypes.includes(file.type)) {
-        setVideoError("Only MP4 and MOV formats are allowed");
-        return;
+        toast.error("Only MP4 and MOV formats are allowed");
+        return false;
       }
-
-      setVideo(file);
-      setVideoError(null);
     }
+
+    return true;
   };
 
-  const extractAddressAndUpdateMap = async (file: File) => {
-    setLoading(true);
-    try {
-      // Mock address extraction - replace with actual OCR or manual input
-      const mockAddress = "123 Business Street, City, Country";
-      
-      // Get coordinates from address using Geocoding API
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(mockAddress)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-      );
-      const data = await response.json();
+  const handleFileChange = async (documentId: string, file: File | null) => {
+    if (!file) return;
 
-      if (data.results?.[0]?.geometry?.location) {
-        setAddress({
-          lat: data.results[0].geometry.location.lat,
-          lng: data.results[0].geometry.location.lng,
-          formatted: mockAddress
-        });
+    // Update state to show validating
+    setDocuments(prev => ({
+      ...prev,
+      [documentId]: {
+        ...prev[documentId],
+        file,
+        status: 'validating'
       }
-    } catch (error) {
-      console.error('Error extracting address:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }));
 
-  const handleSubmit = async () => {
-    // Validate all required documents are uploaded
-    const requiredDocs = Object.values(documents).every(doc => doc.uploaded);
-    if (!requiredDocs || !video) {
-      alert("Please upload all required documents and pitch video");
+    // Validate the file
+    const isValid = await validateFile(file, 'document');
+    if (!isValid) {
+      setDocuments(prev => ({
+        ...prev,
+        [documentId]: {
+          ...prev[documentId],
+          status: 'error'
+        }
+      }));
       return;
     }
 
     try {
-      // Here you would upload the files to your backend
-      // Navigate to next step or success page
-      router.push('/dashboard/investee/application/review');
+      if (!edgestore) {
+        toast.error("Upload service unavailable");
+        setDocuments(prev => ({
+          ...prev,
+          [documentId]: { ...prev[documentId], status: 'error' }
+        }));
+        return;
+      }
+
+      // Upload to EdgeStore
+      const res = await edgestore.publicFiles.upload({
+        file,
+        onProgressChange: (progress) => {
+          console.log(`${documentId} upload progress:`, progress);
+        },
+      });
+
+      // Update state with success
+      setDocuments(prev => ({
+        ...prev,
+        [documentId]: {
+          file,
+          status: 'success',
+          url: res.url
+        }
+      }));
+      toast.success(`${documentId.replace(/([A-Z])/g, ' $1').trim()} uploaded successfully!`);
     } catch (error) {
-      console.error('Error uploading files:', error);
-      alert('Error uploading files. Please try again.');
+      console.error(`Error uploading ${documentId}:`, error);
+      setDocuments(prev => ({
+        ...prev,
+        [documentId]: { ...prev[documentId], status: 'error' }
+      }));
+      toast.error(`Failed to upload ${documentId.replace(/([A-Z])/g, ' $1').trim()}`);
+    }
+  };
+
+  const handleVideoUpload = async (file: File | null) => {
+    if (!file) return;
+
+    setVideoStatus('validating');
+    setVideoError(null);
+
+    // Validate the video
+    const isValid = await validateFile(file, 'video');
+    if (!isValid) {
+      setVideoStatus('error');
+      return;
+    }
+
+    try {
+      if (!edgestore) {
+        throw new Error("Upload service unavailable");
+      }
+
+      // Upload to EdgeStore
+      const res = await edgestore.publicFiles.upload({
+        file,
+        onProgressChange: (progress) => {
+          console.log("Video upload progress:", progress);
+        },
+      });
+
+      setVideo(file);
+      setVideoStatus('success');
+      setVideoUrl(res.url);
+      toast.success("Pitch video uploaded successfully!");
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      setVideoStatus('error');
+      setVideoError("Failed to upload video. Please try again.");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>, documentId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const droppedFile = e.dataTransfer.files[0];
+    if (!droppedFile) return;
+    
+    await handleFileChange(documentId, droppedFile);
+  }, []);
+
+  const handleSubmit = async () => {
+    // Validate all required documents are uploaded
+    const allDocumentsUploaded = Object.values(documents).every(doc => doc.status === 'success');
+    if (!allDocumentsUploaded || videoStatus !== 'success') {
+      toast.error("Please upload all required documents and pitch video");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (!applicationId || !loggedInUser) {
+        throw new Error("Missing application ID or user information");
+      }
+
+      // Get all document URLs
+      const documentUrls = Object.entries(documents).reduce((acc, [key, value]) => {
+        acc[key] = value.url;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // Find the application document and update it
+      const applicationsRef = collection(db, "applications");
+      const querySnapshot = await getDocs(applicationsRef);
+      let applicationDoc: DocumentSnapshot<any> | null = null;
+
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.id.toString() === applicationId) {
+          applicationDoc = doc;
+        }
+      });
+
+      if (!applicationDoc) {
+        throw new Error("Application not found");
+      }
+
+      if (!applicationDoc) {
+        throw new Error("Application not found");
+      }
+      //@ts-ignore
+      await updateDoc(applicationDoc.ref as any, {
+        documents: documentUrls,
+        videoLink: videoUrl
+      });
+
+      toast.success("Application submitted successfully!");
+      router.push(`/dashbaord/investee/viewapplication?id=${applicationId}`);
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      toast.error("Failed to submit application. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -148,7 +266,7 @@ export default function DocumentUpload() {
         <span className="text-xl font-medium">Investrix</span>
         <Button 
           variant="ghost" 
-          className="text-gray-300 hover:text-white"
+          className="text-white bg-black hover:bg-white hover:text-black"
           onClick={() => router.back()}
         >
           Back
@@ -172,10 +290,21 @@ export default function DocumentUpload() {
                       PDF, JPEG or PNG (max. 5MB)
                     </p>
                   </div>
-                  {status.uploaded && <CheckCircle className="text-green-500 h-5 w-5" />}
+                  {status.status === 'success' && <CheckCircle className="text-green-500 h-5 w-5" />}
+                  {status.status === 'validating' && <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />}
+                  {status.status === 'error' && <AlertCircle className="text-red-500 h-5 w-5" />}
                 </div>
 
-                <div className="mt-4">
+                <div 
+                  className={`mt-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
+                    ${status.status === 'idle' ? 'border-gray-500 hover:border-white' : ''}
+                    ${status.status === 'validating' ? 'border-yellow-500' : ''}
+                    ${status.status === 'success' ? 'border-green-500' : ''}
+                    ${status.status === 'error' ? 'border-red-500' : ''}`
+                  }
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, docId)}
+                >
                   <input
                     type="file"
                     id={docId}
@@ -185,73 +314,69 @@ export default function DocumentUpload() {
                   />
                   <label
                     htmlFor={docId}
-                    className="flex items-center justify-center gap-2 py-2 px-4 border border-[#333333] rounded-lg cursor-pointer hover:bg-[#333333] transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Upload className="h-4 w-4" />
-                    {status.file ? 'Change File' : 'Upload File'}
+                    <Upload className="h-6 w-6" />
+                    {status.file ? 'Change File' : 'Drag & drop or click to upload'}
                   </label>
                   {status.file && (
                     <p className="text-sm text-gray-400 mt-2">{status.file.name}</p>
                   )}
-                  {status.error && (
-                    <p className="text-red-500 text-sm mt-2">{status.error}</p>
-                  )}
                 </div>
               </div>
             ))}
-
-            {/* Map Section */}
-            {address && (
-              <div className="p-4 border border-[#333333] rounded-lg">
-                <h3 className="font-medium mb-2">Business Location</h3>
-                <p className="text-sm text-gray-400 mb-4">{address.formatted}</p>
-                <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-                  <GoogleMap
-                    mapContainerClassName="w-full h-[200px] rounded-lg"
-                    center={address}
-                    zoom={15}
-                  >
-                    <Marker position={address} />
-                  </GoogleMap>
-                </LoadScript>
-              </div>
-            )}
           </div>
 
           {/* Video Upload Section */}
           <div className="space-y-6">
             <div className="p-4 border border-[#333333] rounded-lg">
-              <h3 className="font-medium mb-2">Pitch Video</h3>
-              <p className="text-sm text-gray-400 mb-4">
-                Upload a short video (max. 50MB) pitching your business and loan requirement
-              </p>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-medium">Pitch Video</h3>
+                  <p className="text-sm text-gray-400">
+                    Upload a short video (max. 50MB) pitching your business and loan requirement
+                  </p>
+                </div>
+                {videoStatus === 'success' && <CheckCircle className="text-green-500 h-5 w-5" />}
+                {videoStatus === 'validating' && <Loader2 className="text-yellow-500 h-5 w-5 animate-spin" />}
+                {videoStatus === 'error' && <AlertCircle className="text-red-500 h-5 w-5" />}
+              </div>
 
-              <input
-                type="file"
-                id="pitchVideo"
-                className="hidden"
-                accept="video/mp4,video/quicktime"
-                onChange={(e) => handleVideoUpload(e.target.files?.[0] || null)}
-              />
-              <label
-                htmlFor="pitchVideo"
-                className="flex items-center justify-center gap-2 py-2 px-4 border border-[#333333] rounded-lg cursor-pointer hover:bg-[#333333] transition-colors"
+              <div 
+                className={`mt-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
+                  ${videoStatus === 'idle' ? 'border-gray-500 hover:border-white' : ''}
+                  ${videoStatus === 'validating' ? 'border-yellow-500' : ''}
+                  ${videoStatus === 'success' ? 'border-green-500' : ''}
+                  ${videoStatus === 'error' ? 'border-red-500' : ''}`
+                }
               >
-                <Upload className="h-4 w-4" />
-                {video ? 'Change Video' : 'Upload Video'}
-              </label>
-              {video && (
-                <p className="text-sm text-gray-400 mt-2">{video.name}</p>
-              )}
-              {videoError && (
-                <p className="text-red-500 text-sm mt-2">{videoError}</p>
-              )}
+                <input
+                  type="file"
+                  id="pitchVideo"
+                  className="hidden"
+                  accept="video/mp4,video/quicktime"
+                  onChange={(e) => handleVideoUpload(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="pitchVideo"
+                  className="flex flex-col items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Upload className="h-6 w-6" />
+                  {video ? 'Change Video' : 'Drag & drop or click to upload'}
+                </label>
+                {video && (
+                  <p className="text-sm text-gray-400 mt-2">{video.name}</p>
+                )}
+                {videoError && (
+                  <p className="text-red-500 text-sm mt-2">{videoError}</p>
+                )}
+              </div>
 
-              {video && (
+              {video && videoStatus === 'success' && (
                 <video
                   className="mt-4 w-full rounded-lg"
                   controls
-                  src={URL.createObjectURL(video)}
+                  src={videoUrl || URL.createObjectURL(video)}
                 />
               )}
             </div>
@@ -262,7 +387,7 @@ export default function DocumentUpload() {
         <div className="mt-8 flex justify-end gap-4">
           <Button
             variant="outline"
-            className="border-white text-white hover:bg-[#333333]"
+            className="border-white text-white bg-black hover:bg-white hover:text-black"
             onClick={() => router.back()}
           >
             Back
@@ -270,9 +395,9 @@ export default function DocumentUpload() {
           <Button
             className="bg-white text-black hover:bg-gray-200"
             onClick={handleSubmit}
-            disabled={!Object.values(documents).every(doc => doc.uploaded) || !video}
+            disabled={isSubmitting || !Object.values(documents).every(doc => doc.status === 'success') || videoStatus !== 'success'}
           >
-            Submit Application
+            {isSubmitting ? "Submitting..." : "Submit Application"}
           </Button>
         </div>
       </div>

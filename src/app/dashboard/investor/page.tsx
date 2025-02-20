@@ -105,8 +105,6 @@ export default function InvestorDashboard() {
           if (a.isSpecial === b.isSpecial) return 0;
           return a.isSpecial ? -1 : 1;
         });
-
-        toast.success("Applications loaded successfully");
         setLoanApplications(sortedApplications);
       } else {
         toast.error("No applications found");
@@ -142,7 +140,6 @@ export default function InvestorDashboard() {
       });
 
       setFinalizedBids(filteredApplications);
-      toast.success('Bids loaded successfully');
     } catch (error) {
       console.error('Error fetching finalized bids:', error);
       toast.error('Failed to load bids');
@@ -250,7 +247,7 @@ export default function InvestorDashboard() {
                   <div className="flex gap-3">
                     <Button
                       className="bg-white text-black hover:bg-gray-200"
-                      onClick={() => router.push(`/viewapplication/?id=${application.id}`)}
+                      onClick={() => router.push(`/dashboard/investor/viewapplication/?id=${application.id}`)}
                     >
                       View Application
                     </Button>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChatToggleButton } from "@/components/ChatToggleButton";
 import { Toaster } from "react-hot-toast";
+import { EdgeStoreProvider } from "@/lib/edgestore";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -35,9 +36,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Toaster position="bottom-right" />
-        {children}
-        <ChatToggleButton />
+        <EdgeStoreProvider>
+          <Toaster position="bottom-right" />
+          {children}
+          <ChatToggleButton />
+        </EdgeStoreProvider>
+
       </body>
     </html>
   );

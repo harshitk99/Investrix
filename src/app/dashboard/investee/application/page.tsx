@@ -1,12 +1,32 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from 'react-hot-toast';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from '@/app/firebase';
+
+interface FormData {
+  companyName: string;
+  ownerName: string;
+  contactNumber: string;
+  businessType: string;
+  yearsInOperation: string;
+  annualRevenue: string;
+  loanAmount: string;
+  purpose: string;
+  companyDescription: string;
+  agreeToTerms: boolean;
+}
 
 export default function NewApplication() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const [loggedInUser, setLoggedInUser] = useState("");
+  const [submittedApplicationId, setSubmittedApplicationId] = useState(0);
+  
+  const [formData, setFormData] = useState<FormData>({
     companyName: "",
     ownerName: "",
     contactNumber: "",
@@ -20,6 +40,18 @@ export default function NewApplication() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Authentication check
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setLoggedInUser(user.uid);
+      } else {
+        router.push("/login");
+      }
+    });
+  }, [router]);
 
   const businessTypes = [
     "Manufacturing",
@@ -81,10 +113,50 @@ export default function NewApplication() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const randomID = () => {
+    return Math.floor(Math.random() * 1000000000);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      router.push('/dashboard/investee/application/documents');
+      setIsSubmitting(true);
+      try {
+        const applicationId = randomID();
+        setSubmittedApplicationId(applicationId);
+        
+        // Map form data to application data structure
+        const applicationData = {
+          userId: loggedInUser,
+          id: applicationId,
+          applicationId,
+          companyName: formData.companyName,
+          contactPerson: formData.ownerName,
+          phone: formData.contactNumber,
+          businessType: formData.businessType,
+          yearsInOperation: formData.yearsInOperation,
+          annualRevenue: formData.annualRevenue,
+          loanAmount: formData.loanAmount,
+          loanPurpose: formData.purpose,
+          companyDescription: formData.companyDescription,
+          loanAmountInINR: parseInt(formData.loanAmount) * 777.36,
+          fundingReceived: 0,
+          fundingStatus: "pending",
+          agreeTerms: formData.agreeToTerms
+        };
+
+        // Save to Firestore
+        const applicationRef = doc(db, "applications", applicationId.toString());
+        await setDoc(applicationRef, applicationData);
+
+        toast.success("Application submitted successfully!");
+        router.push(`/dashboard/investee/application/documents?id=${applicationId}&userId=${loggedInUser}`);
+      } catch (error) {
+        console.error("Error submitting application:", error);
+        toast.error("Failed to submit the application. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -284,8 +356,9 @@ export default function NewApplication() {
           <Button
             type="submit"
             className="w-full bg-white text-black hover:bg-gray-200"
+            disabled={isSubmitting}
           >
-            Continue to Document Upload
+            {isSubmitting ? "Submitting..." : "Continue to Document Upload"}
           </Button>
         </form>
       </div>

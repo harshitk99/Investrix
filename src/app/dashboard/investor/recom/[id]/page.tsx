@@ -221,7 +221,7 @@ export default function Preferences() {
                   </div>
                   <div className="mt-auto flex justify-end">
                     <Button
-                      onClick={() => router.push(`/viewapplication?id=${app.applicationId}`)}
+                      onClick={() => router.push(`/dashboard/investor/viewapplication?id=${app.applicationId}`)}
                       className="bg-white hover:bg-gray-200 text-black"
                     >
                       View Application

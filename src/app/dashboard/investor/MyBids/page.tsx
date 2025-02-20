@@ -137,7 +137,7 @@ export default function MyBids() {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button className="mt-4 bg-blue-500 text-white hover:bg-blue-600" onClick={() => router.push(`/viewapplication/?id=${bid.applicationId}`)}>
+                <Button className="mt-4 bg-blue-500 text-white hover:bg-blue-600" onClick={() => router.push(`/dashboard/investor/viewapplication/?id=${bid.applicationId}`)}>
                   View Application
                 </Button>
               </div>
