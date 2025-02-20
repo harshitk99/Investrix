@@ -227,7 +227,6 @@ export default function BidPage() {
     if (!company) {
       return (
         <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <Toaster position="top-right" />
           <div className="text-center">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent" role="status">
               <span className="sr-only">Loading...</span>
@@ -240,8 +239,6 @@ export default function BidPage() {
 
     return (
       <div className="min-h-screen bg-black text-white p-6 relative">
-        <Toaster position="top-right" />
-
         {/* Success Notification */}
         {showNotification && (
           <div className="fixed top-6 right-6 bg-green-500 text-black px-6 py-3 rounded-md shadow-lg flex items-center gap-2 transition-all duration-300">

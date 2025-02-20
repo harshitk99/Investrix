@@ -100,12 +100,12 @@ export default function InvestorDashboard() {
         (await docRef).forEach((doc) => {
           applications.push({ id: doc.id, ...doc.data() } as LoanApplication);
         });
-        
+
         const sortedApplications = applications.sort((a, b) => {
           if (a.isSpecial === b.isSpecial) return 0;
           return a.isSpecial ? -1 : 1;
         });
-        
+
         toast.success("Applications loaded successfully");
         setLoanApplications(sortedApplications);
       } else {
@@ -209,7 +209,7 @@ export default function InvestorDashboard() {
 
       <div className="p-6">
         <div className="flex justify-between items-center mb-8">
-          <Button 
+          <Button
             variant="outline"
             className="border-white bg-black text-white hover:bg-white hover:text-black"
             onClick={() => router.push('/dashboard/investor/MyBids')}
@@ -217,8 +217,8 @@ export default function InvestorDashboard() {
             View My Bids
           </Button>
           <h1 className="text-2xl font-bold">Investor Dashboard</h1>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="border-white bg-black text-white hover:bg-white hover:text-black"
             onClick={() => router.push('/dashboard/investor/preferences')}
           >
@@ -231,7 +231,7 @@ export default function InvestorDashboard() {
             <h2 className="text-xl font-semibold mb-4">SMEs looking for funding</h2>
             <div className="space-y-4 max-h-[600px] overflow-y-auto">
               {loanApplications.map((application) => (
-                <div 
+                <div
                   key={application.id}
                   className={`p-4 rounded-lg border ${application.isSpecial ? 'border-green-500' : 'border-[#333333]'} bg-black hover:border-white transition-colors`}
                 >
@@ -248,13 +248,13 @@ export default function InvestorDashboard() {
                   </p>
                   <p className="text-gray-400 mb-3">Status: {application.fundingStatus}</p>
                   <div className="flex gap-3">
-                    <Button 
+                    <Button
                       className="bg-white text-black hover:bg-gray-200"
                       onClick={() => router.push(`/viewapplication/?id=${application.id}`)}
                     >
                       View Application
                     </Button>
-                    <Button 
+                    <Button
                       className="bg-white text-black hover:bg-gray-200"
                       onClick={() => router.push(`/dashboard/investor/bid/${application.id}`)}
                     >
@@ -273,48 +273,55 @@ export default function InvestorDashboard() {
                 Total Invested: {finalizedBids.reduce((acc, bid) => acc + parseFloat(bid.amount.toString()), 0)} APT
               </p>
             </div>
-            <div className="space-y-4">
-              {finalizedBids.map((bid) => (
-                <div key={bid.id} className="p-4 rounded-lg border border-[#333333] bg-black hover:border-white transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                      {bid.companyName.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium text-white text-lg">{bid.companyName}</h3>
-                          <p className="text-sm text-gray-400">Amount: {bid.amount} APT</p>
-                        </div>
-                        <span className="px-3 py-1 bg-green-500 text-black text-sm rounded-full">
-                          {bid.status}
-                        </span>
+
+            {finalizedBids.length === 0 ? (
+              <div className="text-gray-400 text-center py-6">
+                No finalized bids found.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {finalizedBids.map((bid) => (
+                  <div key={bid.id} className="p-4 rounded-lg border border-[#333333] bg-black hover:border-white transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                        {bid.companyName.slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
-                        <div>
-                          <p className="text-sm text-gray-400">Interest Rate</p>
-                          <p className="text-white font-medium">{bid.interestRate}%</p>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-white text-lg">{bid.companyName}</h3>
+                            <p className="text-sm text-gray-400">Amount: {bid.amount} APT</p>
+                          </div>
+                          <span className="px-3 py-1 bg-green-500 text-black text-sm rounded-full">
+                            {bid.status}
+                          </span>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-400">Tenure</p>
-                          <p className="text-white font-medium">{bid.tenure}</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Interest Rate</p>
+                            <p className="text-white font-medium">{bid.interestRate}%</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Tenure</p>
+                            <p className="text-white font-medium">{bid.tenure}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Status</p>
+                            <p className="text-white font-medium">{bid.status}</p>
+                          </div>
+                          <Button
+                            className="bg-green-500 text-black hover:bg-green-600"
+                            onClick={() => handleFund(bid.applicationId, parseFloat(bid.amount))}
+                          >
+                            Fund Startup
+                          </Button>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-400">Status</p>
-                          <p className="text-white font-medium">{bid.status}</p>
-                        </div>
-                        <Button
-                          className="bg-green-500 text-black hover:bg-green-600"
-                          onClick={() => handleFund(bid.applicationId, parseFloat(bid.amount))}
-                        >
-                          Fund Startup
-                        </Button>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
