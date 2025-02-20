@@ -5,13 +5,26 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/app/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Download, Mail, Phone, X } from "lucide-react";
+import {
+  Award,
+  Calendar,
+  DollarSign,
+  IndianRupee,
+  Phone,
+  Tag,
+  X,
+  Building,
+  Briefcase,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  Users,
+
+} from "lucide-react";
 import toast from "react-hot-toast";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   LineChart,
   Line,
   XAxis,
@@ -19,36 +32,39 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
 } from 'recharts';
 
 // Types
 interface Application {
-  id: string;
+  id: string | number;
   companyName: string;
   businessType: string;
-  tags: Array<string | { tag: string; isSpecial: boolean }>;
+  tags?: Array<string | { tag: string; isSpecial: boolean }>;
   loanPurpose: string;
-  yearsInOperation: number;
-  annualRevenue: number;
+  yearsInOperation: number | string;
+  annualRevenue: number | string;
   phone: string;
   fundingStatus: string;
-  fundingReceived: string;
-  loanAmount: number;
+  fundingReceived: number;
+  loanAmount: number | string;
   loanAmountInINR: number;
-  pitch: string;
-  videoLink: string;
-  industry?: string;
+  pitch?: string;
+  videoLink?: string;
+  videoUrl?: string;
+  companyDescription?: string;
   status?: string;
-  description?: string;
   contact?: {
     companyEmail: string;
     companyPhone: string;
-    ceoEmail: string;
-    ctoEmail: string;
   };
+  documents?: {
+    identityProof: string;
+    bankStatements: string;
+    taxReturns: string;
+    addressProof: string;
+  };
+  contactPerson?: string;
+  submittedDate?: string;
 }
 
 interface ShowGraphs {
@@ -58,40 +74,10 @@ interface ShowGraphs {
   burnRate: boolean;
 }
 
-// Mock data for graphs (you might want to move this to a separate file)
-const mockGraphData = {
-  revenueGrowth: [
-    { month: 'Jan', revenue: 12 },
-    { month: 'Feb', revenue: 19 },
-    { month: 'Mar', revenue: 25 },
-    { month: 'Apr', revenue: 32 },
-    { month: 'May', revenue: 38 },
-    { month: 'Jun', revenue: 45 }
-  ],
-  customerGrowth: [
-    { month: 'Jan', customers: 10 },
-    { month: 'Feb', customers: 15 },
-    { month: 'Mar', customers: 25 },
-    { month: 'Apr', customers: 35 },
-    { month: 'May', customers: 45 },
-    { month: 'Jun', customers: 60 }
-  ],
-  marketDistribution: [
-    { name: 'Enterprise', value: 45 },
-    { name: 'SMB', value: 30 },
-    { name: 'Startup', value: 25 }
-  ],
-  burnRate: [
-    { month: 'Jan', burn: 8 },
-    { month: 'Feb', burn: 7.5 },
-    { month: 'Mar', burn: 8.2 },
-    { month: 'Apr', burn: 7.8 },
-    { month: 'May', burn: 7.2 },
-    { month: 'Jun', burn: 6.8 }
-  ]
-};
-
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+// Default categories if none are provided
+const DEFAULT_CATEGORIES = ["Financial Services", "Technology", "Services"];
 
 export default function ApplicationView() {
   const router = useRouter();
@@ -106,6 +92,9 @@ export default function ApplicationView() {
   });
   const [showContactCard, setShowContactCard] = useState(false);
 
+  // Generate current date if submittedDate is not available
+  const currentDate = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const fetchApplication = async () => {
       if (!applicationId) return;
@@ -116,7 +105,31 @@ export default function ApplicationView() {
 
         if (appSnap.exists()) {
           const appData = appSnap.data() as Application;
-          appData.loanAmountInINR = appData.loanAmount * 777.36;
+          // Calculate INR value if not already present
+          if (!appData.loanAmountInINR && appData.loanAmount) {
+            appData.loanAmountInINR = Number(appData.loanAmount) * 777.36;
+          }
+          // Set default status if none exists
+          if (!appData.status) {
+            appData.status = appData.fundingStatus || "Under Review";
+          }
+          // Set pitch from companyDescription if pitch is not available
+          if (!appData.pitch && appData.companyDescription) {
+            appData.pitch = appData.companyDescription;
+          }
+          // Set videoLink from videoUrl if needed
+          if (!appData.videoLink && appData.videoUrl) {
+            appData.videoLink = appData.videoUrl;
+          }
+          // Add default tags if none exist
+          if (!appData.tags) {
+            appData.tags = DEFAULT_CATEGORIES.map(cat => cat);
+          }
+          // Add submission date if missing
+          if (!appData.submittedDate) {
+            appData.submittedDate = currentDate;
+          }
+          
           setApplication(appData);
           toast.success('Application found!');
         } else {
@@ -129,13 +142,36 @@ export default function ApplicationView() {
     };
 
     fetchApplication();
-  }, [applicationId]);
+  }, [applicationId, currentDate]);
 
   const toggleGraph = (metric: keyof ShowGraphs) => {
     setShowGraphs(prev => ({
       ...prev,
       [metric]: !prev[metric]
     }));
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'bg-green-500';
+      case 'rejected':
+        return 'bg-red-500';
+      case 'under review':
+        return 'bg-yellow-500';
+      case 'pending':
+        return 'bg-blue-500';
+      default:
+        return 'bg-blue-500';
+    }
+  };
+
+  const getDocumentStatus = (status: string) => {
+    // Just check if URL exists
+    if (status && status.startsWith('https://')) {
+      return <CheckCircle className="w-5 h-5 text-green-500" />;
+    }
+    return <Clock className="w-5 h-5 text-yellow-500" />;
   };
 
   if (!application) {
@@ -150,185 +186,144 @@ export default function ApplicationView() {
     (tag) => typeof tag === "object" && tag.isSpecial
   );
 
+  // Extract loan details for clear presentation
+  const loanDetails = {
+    amount: typeof application.loanAmount === 'number' ? application.loanAmount.toString() : application.loanAmount,
+    currency: "APT",
+    inrValue: `₹${application.loanAmountInINR.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+    purpose: application.loanPurpose,
+    tenure: "12 months", // Default value
+    interestRate: "12%", // Default value
+    repaymentSchedule: "Monthly", // Default value
+    expectedMonthlyPayment: `${(Number(application.loanAmount) * 0.095).toFixed(1)} APT` // Approximation
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Navigation */}
+    <div className="min-h-screen bg-black text-white">
+      <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
+        <span className="text-xl font-medium">Investrix</span>
         <Button 
-          className="mb-6 bg-white text-black hover:bg-gray-200"
+          variant="outline" 
+          className="text-white bg-black hover:text-black hover:bg-white"
           onClick={() => router.push('/dashboard/investor')}
         >
           Back to Dashboard
         </Button>
+      </nav>
 
-        {/* Company Header */}
-        <div className="border border-[#333333] rounded-xl p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{application.companyName}</h1>
-              <p className="text-gray-400 text-lg">{application.businessType}</p>
-            </div>
-            {hasSpecialTag && (
-              <div className="px-4 py-1 rounded-full bg-green-500 text-black font-medium text-sm">
-                Eco-Friendly
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Main content area - Loan Details and Video */}
+          <div className="md:col-span-2 space-y-6">
+            <div className="bg-[#111111] p-6 rounded-lg border border-[#333333]">
+              <h2 className="text-xl font-semibold mb-4">Loan Details</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-gray-400 text-sm">Amount</p>
+                  <div className="flex items-center mt-1">
+                    <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
+                    <p className="font-medium">{loanDetails.amount} APT</p>
+                  </div>
+                  <p className="text-sm text-gray-500">{loanDetails.inrValue}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Purpose</p>
+                  <div className="flex items-center mt-1">
+                    <Briefcase className="w-4 h-4 mr-1 text-gray-400" />
+                    <p className="font-medium">{loanDetails.purpose}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Founded Since</p>
+                  <div className="flex items-center mt-1">
+                    <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                    <p className="font-medium">{application.yearsInOperation} years</p>
+                  </div>
+                </div>
+
               </div>
-            )}
+            </div>
+            
+            {/* Video Pitch Section */}
+            {application.videoLink || application.videoUrl ? (
+              <div className="border border-[#333333] rounded-xl p-6">
+                <h2 className="text-xl font-bold mb-4">Company Pitch</h2>
+                <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden">
+                  <iframe
+                    src={application.videoLink || application.videoUrl}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute inset-0 w-full h-full"
+                  />
+                </div>
+              </div>
+            ) : null}
+            
+            
+
           </div>
-          <p className="text-gray-400 text-lg">{application.pitch}</p>
-        </div>
 
-        {/* Video Pitch Section */}
-        <div className="border border-[#333333] rounded-xl p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Company Pitch</h2>
-          <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden">
-            <iframe
-              src={application.videoLink}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full"
-            />
-          </div>
-        </div>
-
-        {/* Metrics & Analytics Section - Using mock data for graphs */}
-        <div className="border border-[#333333] rounded-xl p-6 mb-6">
-          <h2 className="text-xl font-bold mb-6">Metrics & Analytics</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Revenue Growth */}
-            <div className="border border-[#333333] rounded-xl p-4">
-              <div className="flex justify-between items-center mb-4">
+          {/* Sidebar - Company Info & Documents */}
+          <div className="space-y-6">
+            <div className="bg-[#111111] p-6 rounded-lg border border-[#333333]">
+              <h2 className="text-xl font-semibold mb-4">Company Information</h2>
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium">Revenue Growth</h3>
-                  <p className="text-gray-400">Annual Revenue: ₹{application.annualRevenue}</p>
+                  <div className="flex items-center mb-2">
+                    <Building className="w-4 h-4 mr-2 text-gray-400" />
+                    <p className="font-medium">{application.companyName}</p>
+                  </div>
+                  <p className="text-sm text-gray-400">{application.businessType}</p>
                 </div>
-                <Button
-                  variant="outline"
-                  className="border-[#333333] text-black hover:border-white"
-                  onClick={() => toggleGraph('revenue')}
-                >
-                  {showGraphs.revenue ? 'Hide Graph' : 'Show Graph'}
-                </Button>
-              </div>
-              {showGraphs.revenue && (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={mockGraphData.revenueGrowth}>
-                      <defs>
-                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#0088FE" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="month" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
-                      <Area type="monotone" dataKey="revenue" stroke="#0088FE" fill="url(#revenueGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
 
-            {/* Customer Growth */}
-            <div className="border border-[#333333] rounded-xl p-4">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-medium">Customer Growth</h3>
-                  <p className="text-gray-400">Total Customers: 60+</p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="border-[#333333] text-black hover:border-black"
-                  onClick={() => toggleGraph('customers')}
-                >
-                  {showGraphs.customers ? 'Hide Graph' : 'Show Graph'}
-                </Button>
-              </div>
-              {showGraphs.customers && (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={mockGraphData.customerGrowth}>
-                      <XAxis dataKey="month" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
-                      <Line type="monotone" dataKey="customers" stroke="#00C49F" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
+                <div className="pt-2">
+                  <p className="text-sm text-gray-400 mb-2">Tags</p>
+                  {/* Tags */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {application.tags?.map((tag, index) => {
+                  const tagText = typeof tag === "object" ? tag.tag : tag;
+                  const isSpecial = typeof tag === "object" && tag.isSpecial;
 
-            {/* Market Distribution */}
-            <div className="border border-[#333333] rounded-xl p-4">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-medium">Market Distribution</h3>
-                  <p className="text-gray-400">Enterprise Focus: 45%</p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="border-[#333333] text-black hover:border-white"
-                  onClick={() => toggleGraph('market')}
-                >
-                  {showGraphs.market ? 'Hide Graph' : 'Show Graph'}
-                </Button>
+                  return (
+                    <span
+                      key={index}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        isSpecial ? "bg-green-500 text-black" : "bg-[#333333] text-white"
+                      }`}
+                    >
+                      {tagText}
+                    </span>
+                  );
+                })}
               </div>
-              {showGraphs.market && (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={mockGraphData.marketDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {mockGraphData.marketDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
                 </div>
-              )}
-            </div>
 
-            {/* Burn Rate */}
-            <div className="border border-[#333333] rounded-xl p-4">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-medium">Monthly Burn Rate</h3>
-                  <p className="text-gray-400">Current: ₹6.8L/month</p>
+                <div className="pt-4">
+                  <p className="text-sm text-gray-400 mb-3">Document Verification</p>
+                  <div className="space-y-3">
+                    {application.documents && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm">Identity Proof</p>
+                          {getDocumentStatus(application.documents.identityProof)}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm">Bank Statements</p>
+                          {getDocumentStatus(application.documents.bankStatements)}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm">Tax Returns</p>
+                          {getDocumentStatus(application.documents.taxReturns)}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm">Address Proof</p>
+                          {getDocumentStatus(application.documents.addressProof)}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="border-[#333333] text-black hover:border-white"
-                  onClick={() => toggleGraph('burnRate')}
-                >
-                  {showGraphs.burnRate ? 'Hide Graph' : 'Show Graph'}
-                </Button>
               </div>
-              {showGraphs.burnRate && (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mockGraphData.burnRate}>
-                      <XAxis dataKey="month" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
-                      <Bar dataKey="burn" fill="#FF8042" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -337,7 +332,7 @@ export default function ApplicationView() {
         {showContactCard && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-black border border-[#333333] rounded-xl p-6 max-w-md w-full relative">
-              <button 
+              <button
                 onClick={() => setShowContactCard(false)}
                 className="absolute top-4 right-4 text-gray-400 hover:text-white"
               >
@@ -345,7 +340,7 @@ export default function ApplicationView() {
               </button>
 
               <h2 className="text-xl font-bold mb-6">Contact Information</h2>
-              
+
               <div className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-400">Company</h3>
@@ -356,10 +351,19 @@ export default function ApplicationView() {
                       <p className="text-white">{application.phone}</p>
                     </div>
                   </div>
+                  {application.contactPerson && (
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-400">Contact Person</p>
+                        <p className="text-white">{application.contactPerson}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <Button 
+              <Button
                 className="w-full mt-6 bg-white text-black hover:bg-gray-200"
                 onClick={() => setShowContactCard(false)}
               >
@@ -370,16 +374,17 @@ export default function ApplicationView() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-4">
-          <Button 
-            className="flex-1 bg-white text-black hover:bg-gray-200 py-6 text-lg"
+        <div className="flex gap-4 mt-6">
+          <Button
+          variant="outline"
+            className="flex-1 bg-black text-white border-white hover:bg-white hover:text-black py-6 text-lg"
             onClick={() => router.push(`/dashboard/investor/bid/${application.id}`)}
           >
             Place Bid
           </Button>
-          <Button 
+          <Button
             variant="outline"
-            className="flex-1 border-white text-black hover:bg-white hover:text-black py-6 text-lg"
+            className="flex-1 border-white bg-black text-white hover:bg-white hover:text-black py-6 text-lg"
             onClick={() => setShowContactCard(true)}
           >
             Contact Company
