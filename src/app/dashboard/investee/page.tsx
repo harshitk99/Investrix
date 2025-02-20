@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import Navbar from "@/components/Navbar";
 
 export default function InvesteeDashboard() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function InvesteeDashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <Navbar />
 
       {/* Main Content */}
       <div className="p-6">
