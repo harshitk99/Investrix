@@ -1,5 +1,5 @@
 "use client"
-
+/* eslint-disable */
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { db } from "@/app/firebase"

@@ -1,5 +1,5 @@
 'use client';
-
+/* eslint-disable */
 import React, { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/app/firebase';

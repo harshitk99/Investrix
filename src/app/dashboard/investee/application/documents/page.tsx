@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable */
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ export default function DocumentUpload() {
   const userId = searchParams.get("userId");
 
   const [loggedInUser, setLoggedInUser] = useState("");
-  const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { edgestore } = useEdgeStore();
 

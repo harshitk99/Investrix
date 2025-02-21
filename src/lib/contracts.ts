@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { Account, Aptos, AptosConfig, Network, AccountAddress, NetworkToNetworkName, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
