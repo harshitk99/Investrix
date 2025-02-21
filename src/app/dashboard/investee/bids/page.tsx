@@ -54,12 +54,6 @@ interface UserData {
   previousInvestments?: string[];
 }
 
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-};
-
-
 export default function BidsOverview() {
   const [filteredBids, setFilteredBids] = useState<Bid[]>([]);
   const [names, setNames] = useState<{ [key: string]: string }>({});

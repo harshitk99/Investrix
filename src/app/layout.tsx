@@ -21,10 +21,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Investrix - Where Innovation Meets Investment",
   description: "AI-powered investment platform connecting investors with opportunities",
-  viewport: "width=device-width, initial-scale=1",
   icons: {
     icon: "/favicon.ico",
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
