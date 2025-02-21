@@ -35,6 +35,12 @@ const selectedBid = {
   ]
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+
 export default function BidConfirmation() {
   const router = useRouter();
   const [isConfirming, setIsConfirming] = useState(false);

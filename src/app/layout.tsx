@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChatToggleButton } from "@/components/ChatToggleButton";
@@ -36,12 +37,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Suspense fallback={<div>Loading...</div>}>
         <EdgeStoreProvider>
           <Toaster position="bottom-right" />
           {children}
           <ChatToggleButton />
         </EdgeStoreProvider>
-
+        </Suspense>
       </body>
     </html>
   );
