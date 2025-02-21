@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, collection, query, getDocs } from "firebase/firestore";
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/app/firebase';
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/app/firebase";
 import { useParams } from "next/navigation";
 
 // Type definitions
@@ -21,7 +21,7 @@ type Application = {
   yearsInOperation: string;
   fundingStatus: string;
   loanPurpose: string;
-  tags: Array<{ tag: string; isSpecial: boolean }>;
+  tags: string[];
 };
 
 export default function Preferences() {
@@ -116,7 +116,7 @@ export default function Preferences() {
         });
 
         const filteredApps = allApps.filter(app =>
-          app.tags && app.tags.some(tag => selectedPreferences.includes(tag.tag))
+          app.tags && app.tags.some(tag => selectedPreferences.includes(tag))
         );
 
         setApplications(filteredApps);

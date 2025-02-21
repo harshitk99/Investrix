@@ -18,8 +18,8 @@ import {
 // Mock selected bid data - replace with actual data from your state management
 const selectedBid = {
   id: "BID001",
-  investorName: "Alpha Ventures",
-  investorType: "Venture Capital",
+  investorName: "Harshit",
+  investorType: "Individual Investor",
   bidAmount: "120",
   currency: "APT",
   inrValue: "₹93,283",
