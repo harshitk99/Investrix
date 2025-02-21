@@ -1,6 +1,7 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import {
   Building,
@@ -8,53 +9,132 @@ import {
   Calendar,
   TrendingUp,
   CheckCircle,
-  Clock,
   Shield,
   AlertCircle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { db } from '@/app/firebase';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// Mock data - replace with API call
-const mockBids = [
-  {
-    id: "BID001",
-    investorName: "Alpha Ventures",
-    investorType: "Venture Capital",
-    bidAmount: "120",
-    currency: "APT",
-    inrValue: "₹93,283",
-    interestRate: "10.5%",
-    tenure: "12 months",
-    monthlyPayment: "11 APT",
-    status: "active",
-    bidDate: "2024-02-25",
-    investorDetails: {
-      portfolioSize: "₹100 Cr",
-      successfulInvestments: 25,
-      averageInvestmentSize: "₹2 Cr",
-      verificationStatus: "verified",
-      description: "Leading early-stage technology investor with focus on B2B SaaS",
-      previousInvestments: ["TechCo", "SaaSify", "CloudTech"]
-    }
-  },
-  // Add more mock bids...
-];
+// Types
+interface Bid {
+  bidId: string;
+  userId: string;
+  applicationId: string;
+  interestRate: string;
+  tenure: string;
+  status: string;
+  loanAmount: string;
+  currency: string;
+  inrValue: string;
+  monthlyPayment: string;
+  bidDate: string;
+  investorDetails?: {
+    portfolioSize: string;
+    successfulInvestments: number;
+    averageInvestmentSize: string;
+    verificationStatus: string;
+    description: string;
+    previousInvestments: string[];
+  };
+}
+
+interface UserData {
+  displayName: string;
+  finalizedBid?: {
+    applicationId: string;
+    finalized: boolean;
+  };
+  portfolioSize?: string;
+  successfulInvestments?: number;
+  averageInvestmentSize?: string;
+  verificationStatus?: string;
+  description?: string;
+  previousInvestments?: string[];
+}
 
 export default function BidsOverview() {
-  const router = useRouter();
+  const [filteredBids, setFilteredBids] = useState<Bid[]>([]);
+  const [names, setNames] = useState<{ [key: string]: string }>({});
+  const [showModal, setShowModal] = useState(false);
+  const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [expandedBid, setExpandedBid] = useState<string | null>(null);
-  const [selectedBid, setSelectedBid] = useState<string | null>(null);
+  const search = useSearchParams();
+  const router = useRouter();
+  const id = search.get("id");
+
+  useEffect(() => {
+    const fetchFilteredBids = async () => {
+      if (!id) return;
+
+      try {
+        const q = query(collection(db, 'bids'), where('applicationId', '==', id));
+        const querySnapshot = await getDocs(q);
+
+        const bidsPromises = querySnapshot.docs.map(async (document) => {
+          const bid = { ...document.data(), bidId: document.id } as Bid;
+          const userRef = doc(db, 'users', bid.userId.toString());
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const userData = userSnap.data() as UserData;
+            setNames(prevNames => ({ ...prevNames, [bid.userId]: userData.displayName }));
+            
+            // Add investor details to bid
+            bid.investorDetails = {
+              portfolioSize: userData.portfolioSize || "N/A",
+              successfulInvestments: userData.successfulInvestments || 0,
+              averageInvestmentSize: userData.averageInvestmentSize || "N/A",
+              verificationStatus: userData.verificationStatus || "unverified",
+              description: userData.description || "No description available",
+              previousInvestments: userData.previousInvestments || []
+            };
+          }
+          return bid;
+        });
+
+        const bidsData = await Promise.all(bidsPromises);
+        setFilteredBids(bidsData);
+      } catch (error) {
+        console.error('Error fetching filtered bids:', error);
+      }
+    };
+
+    fetchFilteredBids();
+  }, [id]);
 
   const toggleBidDetails = (bidId: string) => {
     setExpandedBid(expandedBid === bidId ? null : bidId);
   };
 
-  const handleFinalizeBid = async (bidId: string) => {
+  const handleFinalizeBid = async (bid: Bid) => {
     try {
-      // API call to finalize bid would go here
-      console.log(`Finalizing bid: ${bidId}`);
-      // Redirect to confirmation or next step
+      // Finalize all bids for this application
+      const querySnapshot = await getDocs(collection(db, 'bids'));
+      querySnapshot.forEach(async (document) => {
+        if (document.data().applicationId === bid.applicationId) {
+          await updateDoc(doc(db, 'bids', document.id), { status: 'finalized' });
+        }
+      });
+
+      // Update application status
+      const applicationRef = doc(db, 'applications', bid.applicationId);
+      await updateDoc(applicationRef, { fundingStatus: 'finalized' });
+
+      // Update user document
+      const userRef = doc(db, 'users', bid.userId.toString());
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        await updateDoc(userRef, {
+          finalizedBid: {
+            applicationId: bid.applicationId,
+            finalized: true,
+          },
+        });
+      }
+
+      setShowModal(false);
       router.push('/dashboard/investee/bidconfirmation');
     } catch (error) {
       console.error('Error finalizing bid:', error);
@@ -66,8 +146,8 @@ export default function BidsOverview() {
       <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
         <span className="text-xl font-medium">Investrix</span>
         <Button 
-          variant="ghost" 
-          className="text-gray-300 hover:text-white"
+          variant="outline" 
+          className="text-gray-300 bg-black hover:text-black hover:bg-white"
           onClick={() => router.push('/dashboard/investee')}
         >
           Back to Dashboard
@@ -82,7 +162,7 @@ export default function BidsOverview() {
           </div>
           {selectedBid && (
             <Button
-              onClick={() => handleFinalizeBid(selectedBid)}
+              onClick={() => setShowModal(true)}
               className="bg-green-500 text-white hover:bg-green-600"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
@@ -93,11 +173,11 @@ export default function BidsOverview() {
 
         {/* Bids List */}
         <div className="space-y-4">
-          {mockBids.map((bid) => (
+          {filteredBids.map((bid) => (
             <div
-              key={bid.id}
+              key={bid.bidId}
               className={`bg-[#111111] rounded-lg border ${
-                selectedBid === bid.id
+                selectedBid?.bidId === bid.bidId
                   ? 'border-green-500'
                   : 'border-[#333333]'
               }`}
@@ -108,30 +188,29 @@ export default function BidsOverview() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Building className="w-5 h-5 text-gray-400" />
-                      <h3 className="text-lg font-medium">{bid.investorName}</h3>
-                      {bid.investorDetails.verificationStatus === "verified" && (
+                      <h3 className="text-lg font-medium">{names[bid.userId] || "Unknown"}</h3>
+                      {bid.investorDetails?.verificationStatus === "verified" && (
                         <Shield className="w-4 h-4 text-green-500" />
                       )}
                     </div>
-                    <p className="text-sm text-gray-400">{bid.investorType}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <Button
                       variant="outline"
                       className={`border-[#333333] ${
-                        selectedBid === bid.id
+                        selectedBid?.bidId === bid.bidId
                           ? 'bg-green-500 text-black hover:bg-green-600'
-                          : 'text-black hover:bg-[#222222]'
+                          : 'text-black hover:bg-black hover:text-white ]'
                       }`}
-                      onClick={() => setSelectedBid(selectedBid === bid.id ? null : bid.id)}
+                      onClick={() => setSelectedBid(selectedBid?.bidId === bid.bidId ? null : bid)}
                     >
-                      {selectedBid === bid.id ? 'Selected' : 'Select Bid'}
+                      {selectedBid?.bidId === bid.bidId ? 'Selected' : 'Select Bid'}
                     </Button>
                     <button
-                      onClick={() => toggleBidDetails(bid.id)}
+                      onClick={() => toggleBidDetails(bid.bidId)}
                       className="text-gray-400 hover:text-white"
                     >
-                      {expandedBid === bid.id ? (
+                      {expandedBid === bid.bidId ? (
                         <ChevronUp className="w-5 h-5" />
                       ) : (
                         <ChevronDown className="w-5 h-5" />
@@ -146,7 +225,7 @@ export default function BidsOverview() {
                     <p className="text-sm text-gray-400">Bid Amount</p>
                     <div className="flex items-center mt-1">
                       <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
-                      <p className="font-medium">{bid.bidAmount} {bid.currency}</p>
+                      <p className="font-medium">{bid.loanAmount} {bid.currency}</p>
                     </div>
                     <p className="text-sm text-gray-500">{bid.inrValue}</p>
                   </div>
@@ -172,7 +251,7 @@ export default function BidsOverview() {
               </div>
 
               {/* Expanded Details */}
-              {expandedBid === bid.id && (
+              {expandedBid === bid.bidId && bid.investorDetails && (
                 <div className="px-6 pb-6 border-t border-[#333333] mt-4 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -215,7 +294,7 @@ export default function BidsOverview() {
           ))}
         </div>
 
-        {mockBids.length === 0 && (
+        {filteredBids.length === 0 && (
           <div className="text-center py-12">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No Active Bids</h3>
@@ -226,6 +305,33 @@ export default function BidsOverview() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      {showModal && selectedBid && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-[#111111] p-8 rounded-lg border border-[#333333]">
+            <h3 className="text-xl font-medium mb-4">Confirm Bid Finalization</h3>
+            <p className="text-gray-400 mb-6">
+              Are you sure you want to finalize this bid? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowModal(false)}
+                className="border-[#333333] text-black"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleFinalizeBid(selectedBid)}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                Confirm Finalization
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,18 +22,20 @@ type LoanApplication = {
 };
 
 type FinalizedBid = {
-  loanAmount: any;
   id: string;
-  companyName: string;
-  amount: string;
-  inrValue: string;
-  date: string;
-  status: string;
-  interestRate: number;
-  tenure: string;
   applicationId: string;
+  additionalDetails?: string;
+  interestRate: string | number;
+  loanAmount: string | number;
+  status: string;
+  tenure: string;
   userId: string;
-  fundingReceived: number;
+  createdAt?: any;
+  companyName?: string;
+  amount?: string | number;
+  inrValue?: string;
+  date?: string;
+  fundingReceived?: number;
 };
 
 interface ModalProps {
@@ -119,27 +121,42 @@ export default function InvestorDashboard() {
   const fetchFinalizedBids = async (userId: string) => {
     try {
       const querySnapshot = await getDocs(collection(db, "bids"));
-      const applicationsData: FinalizedBid[] = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        companyName: doc.data().companyName,
-        amount: doc.data().amount,
-        inrValue: doc.data().inrValue,
-        date: doc.data().date,
-        status: doc.data().status,
-        interestRate: doc.data().interestRate,
-        tenure: doc.data().tenure,
-        applicationId: doc.data().applicationId,
-        userId: doc.data().userId,
-        fundingReceived: doc.data().fundingReceived,
-        loanAmount: doc.data().loanAmount,
-      }));
+      const bids: FinalizedBid[] = [];
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+        if (data.status === 'finalized' && data.userId === userId) {
+          // Get company name from application if needed
+          let companyName = data.companyName || "";
+          try {
+            if (!companyName && data.applicationId) {
+              const applicationDoc = await getDoc(doc(db, "applications", data.applicationId));
+              if (applicationDoc.exists()) {
+                companyName = applicationDoc.data().companyName || "";
+              }
+            }
+          } catch (err) {
+            console.error("Error fetching company name:", err);
+          }
+          
+          bids.push({
+            id: docSnapshot.id,
+            applicationId: data.applicationId || "",
+            companyName: companyName,
+            amount: data.amount || data.loanAmount || "0",
+            inrValue: data.inrValue || `${(parseFloat(String(data.loanAmount || "0")) * 777.36).toFixed(2)}`,
+            date: data.date || (data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : new Date().toLocaleDateString()),
+            status: data.status || "unknown",
+            interestRate: data.interestRate || "0",
+            tenure: data.tenure || "0",
+            userId: data.userId || "",
+            fundingReceived: data.fundingReceived || 0,
+            loanAmount: data.loanAmount || "0",
+          });
+        }
+      }
 
-      const filteredApplications = applicationsData.filter((application) => {
-        const bid = application as FinalizedBid;
-        return bid.status === 'finalized' && bid.userId === userId;
-      });
-
-      setFinalizedBids(filteredApplications);
+      setFinalizedBids(bids);
     } catch (error) {
       console.error('Error fetching finalized bids:', error);
       toast.error('Failed to load bids');
@@ -153,35 +170,46 @@ export default function InvestorDashboard() {
       setIsModalOpen(true);
       toast.success("Startup funded successfully!");
 
+      // Find the relevant bid
       const bidsSnapshot = await getDocs(collection(db, "bids"));
-      const bids: FinalizedBid[] = bidsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as FinalizedBid));
+      let targetBid: FinalizedBid | null = null as FinalizedBid | null;
+      
+      bidsSnapshot.docs.forEach(docSnapshot => {
+        const data = docSnapshot.data();
+        if (data.applicationId === applicationId && data.userId === userId) {
+          targetBid = {
+            ...data as FinalizedBid,
+            id: docSnapshot.id
+          };
+        }
+      });
 
-      const bid = bids.find((bid: FinalizedBid) => bid.applicationId === applicationId);
-
-      if (bid) {
-        const docRef = doc(db, "bids", bid.id);
-        const currentData = bid;
-        const newFundingReceived = (parseFloat(currentData.fundingReceived.toString()) || 0) + amount;
+      if (targetBid) {
+        const docRef = doc(db, "bids", targetBid.id);
+        // Safely convert funding values to numbers
+        const currentFundingReceived = parseFloat(String(targetBid.fundingReceived || 0));
+        const newFundingReceived = currentFundingReceived + amount;
+        const targetLoanAmount = parseFloat(String(targetBid.loanAmount || 0));
 
         await updateDoc(docRef, { fundingReceived: newFundingReceived });
 
-        if (newFundingReceived === parseFloat(bid.loanAmount.toString())) {
+        if (newFundingReceived >= targetLoanAmount) {
           await updateDoc(docRef, { status: "completed" });
-          toast.success("Bid fully funded!");
-        } else if (newFundingReceived > parseFloat(bid.loanAmount.toString())) {
-          await updateDoc(docRef, { status: "completed" });
-          toast("Funding exceeds requested amount");
+          if (newFundingReceived > targetLoanAmount) {
+            toast("Funding exceeds requested amount");
+          } else {
+            toast.success("Bid fully funded!");
+          }
         }
 
+        // Update the application's loan amount
         const applicationRef = doc(db, "applications", applicationId);
         const applicationSnapshot = await getDoc(applicationRef);
 
         if (applicationSnapshot.exists()) {
           const applicationData = applicationSnapshot.data();
-          const newLoanAmount = applicationData.loanAmount - amount;
+          const currentAppLoanAmount = parseFloat(String(applicationData.loanAmount || 0));
+          const newLoanAmount = Math.max(0, currentAppLoanAmount - amount);
           await updateDoc(applicationRef, { loanAmount: newLoanAmount });
           fetchLoanApplications(userId!);
         }
@@ -191,6 +219,16 @@ export default function InvestorDashboard() {
     } catch (error) {
       console.error("Error funding the startup:", error);
       toast.error("Failed to fund startup");
+    }
+  };
+
+  const safeParseFloat = (value: any): number => {
+    if (value === undefined || value === null) return 0;
+    if (typeof value === 'number') return value;
+    try {
+      return parseFloat(value.toString()) || 0;
+    } catch (e) {
+      return 0;
     }
   };
 
@@ -267,7 +305,7 @@ export default function InvestorDashboard() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Your Finalized Bids</h2>
               <p className="text-gray-400">
-                Total Invested: {finalizedBids.reduce((acc, bid) => acc + parseFloat(bid.amount.toString()), 0)} APT
+                Total Invested: {finalizedBids.reduce((acc, bid) => acc + safeParseFloat(bid.amount || bid.loanAmount), 0).toFixed(2)} APT
               </p>
             </div>
 
@@ -281,13 +319,15 @@ export default function InvestorDashboard() {
                   <div key={bid.id} className="p-4 rounded-lg border border-[#333333] bg-black hover:border-white transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                        {bid.companyName.slice(0, 2).toUpperCase()}
+                        {bid.companyName && bid.companyName.length > 0 
+                          ? bid.companyName.slice(0, 2).toUpperCase() 
+                          : "SM"}
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-medium text-white text-lg">{bid.companyName}</h3>
-                            <p className="text-sm text-gray-400">Amount: {bid.amount} APT</p>
+                            <h3 className="font-medium text-white text-lg">{bid.companyName || "Unknown Company"}</h3>
+                            <p className="text-sm text-gray-400">Amount: {bid.amount || bid.loanAmount || "0"} APT</p>
                           </div>
                           <span className="px-3 py-1 bg-green-500 text-black text-sm rounded-full">
                             {bid.status}
@@ -306,12 +346,6 @@ export default function InvestorDashboard() {
                             <p className="text-sm text-gray-400">Status</p>
                             <p className="text-white font-medium">{bid.status}</p>
                           </div>
-                          <Button
-                            className="bg-green-500 text-black hover:bg-green-600"
-                            onClick={() => handleFund(bid.applicationId, parseFloat(bid.amount))}
-                          >
-                            Fund Startup
-                          </Button>
                         </div>
                       </div>
                     </div>
