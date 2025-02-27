@@ -242,14 +242,21 @@ export default function InvestorDashboard() {
 
   async function proceedToPayment(bid: FinalizedBid) {
     try {
+      // Show loading toast
+      const loadingToast = toast.loading("Processing payment...");
+
       const bidRef = doc(db, "bids", bid.id);
       const bidSnap = await getDoc(bidRef);
       const appRef = doc(db, "applications", bidSnap.data()?.applicationId);
 
       if (!bidSnap.exists()) {
+        toast.dismiss(loadingToast);
         toast.error("Bid not found");
         return;
       }
+
+      // Add a delay of 3 seconds to simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       await updateDoc(bidRef, {
         status: 'finalized',
@@ -258,9 +265,14 @@ export default function InvestorDashboard() {
       await updateDoc(appRef, {
         fundingStatus: 'finalized'
       });
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success("Payment completed successfully!");
+
       setIsModalOpen(true);
     } catch (e) {
-      toast.error("An error occured. Try Again.")
+      toast.error("An error occurred. Try Again.")
     }
   }
 
@@ -351,7 +363,7 @@ export default function InvestorDashboard() {
 
       <Modal
         isOpen={isModalOpen}
-        onClose={() => {setIsModalOpen(false); router.push('/investor');} }
+        onClose={() => { setIsModalOpen(false); router.push('/dashboard/investor'); }}
         transactionHash={transactionHash}
       />
 
