@@ -244,6 +244,7 @@ export default function InvestorDashboard() {
     try {
       const bidRef = doc(db, "bids", bid.id);
       const bidSnap = await getDoc(bidRef);
+      const appRef = doc(db, "applications", bidSnap.data()?.applicationId);
 
       if (!bidSnap.exists()) {
         toast.error("Bid not found");
@@ -253,6 +254,9 @@ export default function InvestorDashboard() {
       await updateDoc(bidRef, {
         status: 'finalized',
         // transactionHash: pendingTransaction.hash
+      });
+      await updateDoc(appRef, {
+        fundingStatus: 'finalized'
       });
       setIsModalOpen(true);
     } catch (e) {
@@ -347,7 +351,7 @@ export default function InvestorDashboard() {
 
       <Modal
         isOpen={isModalOpen}
-        onClose={() => {setIsModalOpen(false); router.push('dashboard/investor');} }
+        onClose={() => {setIsModalOpen(false); router.push('/investor');} }
         transactionHash={transactionHash}
       />
 
