@@ -10,6 +10,14 @@ import { db, auth } from '@/app/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import toast from 'react-hot-toast';
 import { fundStartup } from "@/lib/contracts";
+import {
+  Account,
+  Aptos,
+  AptosConfig,
+  Network,
+} from "@aptos-labs/ts-sdk";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
+
 
 // Types
 type LoanApplication = {
@@ -48,11 +56,19 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, transactionHash }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-900 text-white p-8 rounded-lg max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Payment Successful!</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Payment Successful!</h2>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+        </div>
         <div className="mb-6">
-          <p className="mb-4">Thank you for using Investrix! Your payment is complete.</p>
+          <p className="mb-4">Thank you for using Innvestrix! Your payment is complete.</p>
           {transactionHash && (
             <a
               href={`https://explorer.aptoslabs.com/txn/${transactionHash}/userTxnOverview?network=testnet`}
@@ -64,8 +80,11 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, transactionHash }) => {
             </a>
           )}
         </div>
-        <div className="flex justify-end gap-4">
-          <button onClick={onClose} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+        <div className="flex justify-end">
+          <button 
+            onClick={onClose} 
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
             Close
           </button>
         </div>
@@ -122,7 +141,7 @@ export default function InvestorDashboard() {
     try {
       const querySnapshot = await getDocs(collection(db, "bids"));
       const bids: FinalizedBid[] = [];
-      
+
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
         if ((data.status === 'finalized' || data.status === 'payment') && data.userId === userId) {
@@ -138,7 +157,7 @@ export default function InvestorDashboard() {
           } catch (err) {
             console.error("Error fetching company name:", err);
           }
-          
+
           bids.push({
             id: docSnapshot.id,
             applicationId: data.applicationId || "",
@@ -173,7 +192,7 @@ export default function InvestorDashboard() {
       // Find the relevant bid
       const bidsSnapshot = await getDocs(collection(db, "bids"));
       let targetBid: FinalizedBid | null = null as FinalizedBid | null;
-      
+
       bidsSnapshot.docs.forEach(docSnapshot => {
         const data = docSnapshot.data();
         if (data.applicationId === applicationId && data.userId === userId) {
@@ -221,11 +240,77 @@ export default function InvestorDashboard() {
       toast.error("Failed to fund startup");
     }
   };
-  
-  const proceedToPayment = (bid: FinalizedBid) => {
-    // You would implement the payment logic here
-    router.push(`/dashboard/investor/payment/${bid.id}`);
-  };
+
+  const { account, signAndSubmitTransaction } = useWallet();
+
+
+  async function proceedToPayment(bid: FinalizedBid) {
+  try {
+    // Get the bid document
+    const bidRef = doc(db, "bids", bid.id);
+    const bidSnap = await getDoc(bidRef);
+    
+    if (!bidSnap.exists()) {
+      toast.error("Bid not found");
+      return;
+    }
+    
+    // Get required data
+    const bidData = bidSnap.data();
+    const amount = parseFloat(String(bidData.loanAmount || "0"));
+    
+    // Ensure we have an account
+    if (!account) {
+      toast.error("Wallet not connected");
+      return;
+    }
+    
+    // Create the transaction
+    try {
+      const pendingTransaction = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: "0x1::aptos_account::transfer",
+          typeArguments: [],
+          functionArguments: [bidData.smeuserId, Math.floor(amount * 100000000)] // Convert to octas (10^8)
+        },
+      });
+      
+      // Set transaction hash immediately
+      setTransactionHash(pendingTransaction.hash);
+      
+      // Configure Aptos client
+      const config = new AptosConfig({ network: Network.TESTNET });
+      const aptos = new Aptos(config);
+      
+      // Wait for transaction to complete
+      toast.loading("Processing transaction...");
+      const executedTransaction = await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
+      
+      // Update status in database
+      await updateDoc(bidRef, {
+        status: 'finalized',
+        transactionHash: pendingTransaction.hash
+      });
+      
+      // Show success
+      toast.dismiss();
+      toast.success("Payment successful!");
+      setIsModalOpen(true);
+      
+      // Refresh data
+      if (userId) {
+        fetchFinalizedBids(userId);
+      }
+    } catch (error: any) {
+      console.error("Transaction error:", error);
+      toast.error(error.message || "Transaction failed");
+    }
+  } catch (error: any) {
+    console.error("Payment error:", error);
+    toast.error(error.message || "Failed to process payment");
+  }
+}
 
   const safeParseFloat = (value: any): number => {
     if (value === undefined || value === null) return 0;
@@ -324,8 +409,8 @@ export default function InvestorDashboard() {
                   <div key={bid.id} className="p-4 rounded-lg border border-[#333333] bg-black hover:border-white transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                        {bid.companyName && bid.companyName.length > 0 
-                          ? bid.companyName.slice(0, 2).toUpperCase() 
+                        {bid.companyName && bid.companyName.length > 0
+                          ? bid.companyName.slice(0, 2).toUpperCase()
                           : "SM"}
                       </div>
                       <div className="flex-1">
@@ -352,7 +437,7 @@ export default function InvestorDashboard() {
                             <p className="text-white font-medium">{bid.status}</p>
                           </div>
                         </div>
-                        
+
                         {bid.status === 'payment' && (
                           <div className="mt-4">
                             <p className="text-sm text-red-400 mb-2">
