@@ -125,7 +125,7 @@ export default function InvestorDashboard() {
       
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
-        if (data.status === 'finalized' && data.userId === userId) {
+        if ((data.status === 'finalized' || data.status === 'payment') && data.userId === userId) {
           // Get company name from application if needed
           let companyName = data.companyName || "";
           try {
@@ -220,6 +220,11 @@ export default function InvestorDashboard() {
       console.error("Error funding the startup:", error);
       toast.error("Failed to fund startup");
     }
+  };
+  
+  const proceedToPayment = (bid: FinalizedBid) => {
+    // You would implement the payment logic here
+    router.push(`/dashboard/investor/payment/${bid.id}`);
   };
 
   const safeParseFloat = (value: any): number => {
@@ -329,7 +334,7 @@ export default function InvestorDashboard() {
                             <h3 className="font-medium text-white text-lg">{bid.companyName || "Unknown Company"}</h3>
                             <p className="text-sm text-gray-400">Amount: {bid.amount || bid.loanAmount || "0"} APT</p>
                           </div>
-                          <span className="px-3 py-1 bg-green-500 text-black text-sm rounded-full">
+                          <span className={`px-3 py-1 ${bid.status === 'payment' ? 'bg-yellow-500' : 'bg-green-500'} text-black text-sm rounded-full`}>
                             {bid.status}
                           </span>
                         </div>
@@ -347,6 +352,20 @@ export default function InvestorDashboard() {
                             <p className="text-white font-medium">{bid.status}</p>
                           </div>
                         </div>
+                        
+                        {bid.status === 'payment' && (
+                          <div className="mt-4">
+                            <p className="text-sm text-red-400 mb-2">
+                              Failure to complete payment within 7 days will result in account suspension.
+                            </p>
+                            <Button
+                              className="bg-yellow-500 text-black hover:bg-yellow-600"
+                              onClick={() => proceedToPayment(bid)}
+                            >
+                              Proceed to Payment
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

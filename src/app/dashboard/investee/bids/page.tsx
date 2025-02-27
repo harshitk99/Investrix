@@ -14,7 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { db } from '@/app/firebase';
+import { db, auth } from '@/app/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 // Types
@@ -30,6 +30,7 @@ interface Bid {
   inrValue: string;
   monthlyPayment: string;
   bidDate: string;
+  smeuserId?: string;
   investorDetails?: {
     portfolioSize: string;
     successfulInvestments: number;
@@ -60,9 +61,33 @@ export default function BidsOverview() {
   const [showModal, setShowModal] = useState(false);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [expandedBid, setExpandedBid] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentAptosKey, setCurrentAptosKey] = useState<string | null>(null);
   const search = useSearchParams();
   const router = useRouter();
   const id = search.get("id");
+
+  useEffect(() => {
+    // Get current user ID
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        setCurrentUserId(user.uid);
+        setCurrentAptosKey(user.phoneNumber);
+        const userRef = doc(db, "users", user.uid); // Assuming uid is the document ID
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          console.log("Phone Number:", userSnap.data().phoneNumber);
+          setCurrentAptosKey(userSnap.data().phoneNumber);
+        } else {
+          console.log("No such user!");
+          return null;
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchFilteredBids = async () => {
@@ -76,11 +101,11 @@ export default function BidsOverview() {
           const bid = { ...document.data(), bidId: document.id } as Bid;
           const userRef = doc(db, 'users', bid.userId.toString());
           const userSnap = await getDoc(userRef);
-          
+
           if (userSnap.exists()) {
             const userData = userSnap.data() as UserData;
             setNames(prevNames => ({ ...prevNames, [bid.userId]: userData.displayName }));
-            
+
             // Add investor details to bid
             bid.investorDetails = {
               portfolioSize: userData.portfolioSize || "N/A",
@@ -110,17 +135,29 @@ export default function BidsOverview() {
 
   const handleFinalizeBid = async (bid: Bid) => {
     try {
-      // Finalize all bids for this application
-      const querySnapshot = await getDocs(collection(db, 'bids'));
-      querySnapshot.forEach(async (document) => {
-        if (document.data().applicationId === bid.applicationId) {
-          await updateDoc(doc(db, 'bids', document.id), { status: 'finalized' });
+      // Add smeuserId to the selected bid
+      const selectedBidRef = doc(db, 'bids', bid.bidId);
+      await updateDoc(selectedBidRef, {
+        smeuserId: currentAptosKey,
+        status: 'payment'
+      });
+
+      // Update all other bids for this application to 'payment' status
+      const querySnapshot = await getDocs(
+        query(collection(db, 'bids'), where('applicationId', '==', bid.applicationId))
+      );
+
+      const updatePromises = querySnapshot.docs.map(async (document) => {
+        if (document.id !== bid.bidId) {  // Skip the selected bid as we've already updated it
+          await updateDoc(doc(db, 'bids', document.id), { status: 'payment' });
         }
       });
 
+      await Promise.all(updatePromises);
+
       // Update application status
       const applicationRef = doc(db, 'applications', bid.applicationId);
-      await updateDoc(applicationRef, { fundingStatus: 'finalized' });
+      await updateDoc(applicationRef, { fundingStatus: 'payment' });
 
       // Update user document
       const userRef = doc(db, 'users', bid.userId.toString());
@@ -134,6 +171,8 @@ export default function BidsOverview() {
         });
       }
 
+      //send email
+
       setShowModal(false);
       router.push('/dashboard/investee/bidconfirmation');
     } catch (error) {
@@ -145,8 +184,8 @@ export default function BidsOverview() {
     <div className="min-h-screen bg-black text-white">
       <nav className="flex justify-between items-center px-6 py-4 bg-black border-b border-[#333333]">
         <span className="text-xl font-medium">Investrix</span>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="text-gray-300 bg-black hover:text-black hover:bg-white"
           onClick={() => router.push('/dashboard/investee')}
         >
@@ -176,11 +215,10 @@ export default function BidsOverview() {
           {filteredBids.map((bid) => (
             <div
               key={bid.bidId}
-              className={`bg-[#111111] rounded-lg border ${
-                selectedBid?.bidId === bid.bidId
+              className={`bg-[#111111] rounded-lg border ${selectedBid?.bidId === bid.bidId
                   ? 'border-green-500'
                   : 'border-[#333333]'
-              }`}
+                }`}
             >
               {/* Bid Header */}
               <div className="p-6">
@@ -197,11 +235,10 @@ export default function BidsOverview() {
                   <div className="flex items-center gap-4">
                     <Button
                       variant="outline"
-                      className={`border-[#333333] ${
-                        selectedBid?.bidId === bid.bidId
+                      className={`border-[#333333] ${selectedBid?.bidId === bid.bidId
                           ? 'bg-green-500 text-black hover:bg-green-600'
                           : 'text-black hover:bg-black hover:text-white ]'
-                      }`}
+                        }`}
                       onClick={() => setSelectedBid(selectedBid?.bidId === bid.bidId ? null : bid)}
                     >
                       {selectedBid?.bidId === bid.bidId ? 'Selected' : 'Select Bid'}

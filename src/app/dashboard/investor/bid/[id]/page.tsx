@@ -95,12 +95,23 @@ export default function BidPage() {
     tenure: "",
     additionalDetails: ""
   });
+  const [currentAptosKey, setCurrentAptosKey] = useState<string | null>(null);
 
   // Check authentication status
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
+        const userRef = doc(db, "users", user.uid); // Assuming uid is the document ID
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          console.log("Phone Number:", userSnap.data().phoneNumber);
+          setCurrentAptosKey(userSnap.data().phoneNumber);
+        } else {
+          console.log("No such user!");
+          return null;
+        }
       } else {
         toast.error('Please login to continue');
         router.push('/login');
@@ -112,163 +123,164 @@ export default function BidPage() {
 
   // Fetch application/company details
 
-    useEffect(() => {
-      const fetchApplication = async () => {
-        if (!applicationId) {
-          toast.error('Application ID not found');
-          router.push('/dashboard/investor');
-          return;
-        }
-
-        try {
-          const appRef = doc(db, 'applications', applicationId as string);
-          const appSnap = await getDoc(appRef);
-
-          if (appSnap.exists()) {
-            const appData = appSnap.data();
-            setCompany({
-              id: Array.isArray(applicationId) ? applicationId[0] : applicationId,
-              name: appData.companyName || "",
-              type: appData.companyType || "",
-              industry: appData.industry || "",
-              foundedYear: appData.foundedYear || "",
-              teamSize: appData.teamSize || "",
-              location: appData.location || "",
-              purpose: appData.loanPurpose || "",
-              requestedAmount: `${Math.abs(appData.loanAmount) || ""} APT`,
-              inrValue: `₹${appData.loanAmountInINR?.toLocaleString() || ""}`,
-              description: appData.pitch || "",
-              workDescription: appData.workDescription || "",
-              highlights: appData.highlights || [],
-              annualRevenue: appData.annualRevenue || "",
-              businessType: appData.businessType || "",
-              contactPerson: appData.contactPerson || "",
-              phone: appData.phone || "",
-              documents: appData.documents || [],
-              fundingReceived: appData.fundingReceived || 0,
-              fundingStatus: appData.fundingStatus || "",
-              videoLink: appData.videoLink || "",
-              tags: appData.tags || [],
-              yearsInOperation: appData.yearsInOperation || ""
-            });
-            toast.success('Application details loaded');
-          } else {
-            toast.error('Application not found');
-            router.push('/dashboard/investor');
-          }
-        } catch (error) {
-          console.error('Error fetching application:', error);
-          toast.error('Failed to load application details');
-          router.push('/dashboard/investor');
-        }
-      };
-
-      fetchApplication();
-    }, [applicationId, router]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!company) {
-        toast.error('Cannot submit bid: Company details not available');
+  useEffect(() => {
+    const fetchApplication = async () => {
+      if (!applicationId) {
+        toast.error('Application ID not found');
+        router.push('/dashboard/investor');
         return;
       }
-      setShowModal(true);
-    };
-
-    const handleConfirmedSubmit = async () => {
-      if (!userId || !applicationId) {
-        toast.error('User ID or Application ID is missing');
-        return;
-      }
-
-      setIsSubmitting(true);
-      setShowModal(false);
 
       try {
-        // Add document to Firestore
-        const bidRef = await addDoc(collection(db, 'bids'), {
-          userId: userId,
-          applicationId: applicationId,
-          loanAmount: bidDetails.amount,
-          interestRate: bidDetails.interestRate,
-          tenure: bidDetails.tenure,
-          additionalDetails: bidDetails.additionalDetails,
-          status: 'pending',
-          createdAt: new Date()
-        });
+        const appRef = doc(db, 'applications', applicationId as string);
+        const appSnap = await getDoc(appRef);
 
-        console.log("Bid submitted with ID:", bidRef.id);
-
-        // Show success notification
-        setShowNotification(true);
-
-        // Reset form
-        setBidDetails({
-          amount: "",
-          interestRate: "",
-          tenure: "",
-          additionalDetails: ""
-        });
-
-        // Hide notification and redirect after 5 seconds
-        setTimeout(() => {
-          setShowNotification(false);
+        if (appSnap.exists()) {
+          const appData = appSnap.data();
+          setCompany({
+            id: Array.isArray(applicationId) ? applicationId[0] : applicationId,
+            name: appData.companyName || "",
+            type: appData.companyType || "",
+            industry: appData.industry || "",
+            foundedYear: appData.foundedYear || "",
+            teamSize: appData.teamSize || "",
+            location: appData.location || "",
+            purpose: appData.loanPurpose || "",
+            requestedAmount: `${Math.abs(appData.loanAmount) || ""} APT`,
+            inrValue: `₹${appData.loanAmountInINR?.toLocaleString() || ""}`,
+            description: appData.pitch || "",
+            workDescription: appData.workDescription || "",
+            highlights: appData.highlights || [],
+            annualRevenue: appData.annualRevenue || "",
+            businessType: appData.businessType || "",
+            contactPerson: appData.contactPerson || "",
+            phone: appData.phone || "",
+            documents: appData.documents || [],
+            fundingReceived: appData.fundingReceived || 0,
+            fundingStatus: appData.fundingStatus || "",
+            videoLink: appData.videoLink || "",
+            tags: appData.tags || [],
+            yearsInOperation: appData.yearsInOperation || ""
+          });
+          toast.success('Application details loaded');
+        } else {
+          toast.error('Application not found');
           router.push('/dashboard/investor');
-        }, 5000);
-
+        }
       } catch (error) {
-        console.error("Error submitting bid:", error);
-        toast.error('Failed to place bid');
-      } finally {
-        setIsSubmitting(false);
+        console.error('Error fetching application:', error);
+        toast.error('Failed to load application details');
+        router.push('/dashboard/investor');
       }
     };
 
-    // If company data is not loaded yet, show loading state
+    fetchApplication();
+  }, [applicationId, router]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!company) {
-      return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent" role="status">
-              <span className="sr-only">Loading...</span>
-            </div>
-            <p className="mt-4">Loading application details...</p>
-          </div>
-        </div>
-      );
+      toast.error('Cannot submit bid: Company details not available');
+      return;
+    }
+    setShowModal(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    if (!userId || !applicationId) {
+      toast.error('User ID or Application ID is missing');
+      return;
     }
 
+    setIsSubmitting(true);
+    setShowModal(false);
+
+    try {
+      // Add document to Firestore
+      const bidRef = await addDoc(collection(db, 'bids'), {
+        userId: userId,
+        investorUserId: currentAptosKey,
+        applicationId: applicationId,
+        loanAmount: bidDetails.amount,
+        interestRate: bidDetails.interestRate,
+        tenure: bidDetails.tenure,
+        additionalDetails: bidDetails.additionalDetails,
+        status: 'pending',
+        createdAt: new Date()
+      });
+
+      console.log("Bid submitted with ID:", bidRef.id);
+
+      // Show success notification
+      setShowNotification(true);
+
+      // Reset form
+      setBidDetails({
+        amount: "",
+        interestRate: "",
+        tenure: "",
+        additionalDetails: ""
+      });
+
+      // Hide notification and redirect after 5 seconds
+      setTimeout(() => {
+        setShowNotification(false);
+        router.push('/dashboard/investor');
+      }, 5000);
+
+    } catch (error) {
+      console.error("Error submitting bid:", error);
+      toast.error('Failed to place bid');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // If company data is not loaded yet, show loading state
+  if (!company) {
     return (
-      <div className="min-h-screen bg-black text-white p-6 relative">
-        {/* Success Notification */}
-        {showNotification && (
-          <div className="fixed top-6 right-6 bg-green-500 text-black px-6 py-3 rounded-md shadow-lg flex items-center gap-2 transition-all duration-300">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <span className="font-medium">Bid made successfully!</span>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent" role="status">
+            <span className="sr-only">Loading...</span>
           </div>
-        )}
+          <p className="mt-4">Loading application details...</p>
+        </div>
+      </div>
+    );
+  }
 
-        {/* Confirmation Modal */}
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          onConfirm={handleConfirmedSubmit}
-        />
+  return (
+    <div className="min-h-screen bg-black text-white p-6 relative">
+      {/* Success Notification */}
+      {showNotification && (
+        <div className="fixed top-6 right-6 bg-green-500 text-black px-6 py-3 rounded-md shadow-lg flex items-center gap-2 transition-all duration-300">
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+          <span className="font-medium">Bid made successfully!</span>
+        </div>
+      )}
 
-<div className="max-w-6xl mx-auto">
-        <Button 
+      {/* Confirmation Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onConfirm={handleConfirmedSubmit}
+      />
+
+      <div className="max-w-6xl mx-auto">
+        <Button
           className="mb-6 bg-white text-black hover:bg-gray-200"
           onClick={() => router.back()}
         >
@@ -288,9 +300,8 @@ export default function BidPage() {
                     {company.tags.map((tag, index) => (
                       <span
                         key={index}
-                        className={`px-2 py-1 rounded-full text-sm ${
-                          tag.isSpecial ? 'bg-blue-500' : 'bg-gray-700'
-                        }`}
+                        className={`px-2 py-1 rounded-full text-sm ${tag.isSpecial ? 'bg-blue-500' : 'bg-gray-700'
+                          }`}
                       >
                         {tag.tag}
                       </span>
@@ -328,12 +339,12 @@ export default function BidPage() {
             <div className="border border-[#333333] rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">About Company</h2>
               <p className="text-gray-400 mb-6">{company.description}</p>
-              
+
               <h3 className="text-lg font-semibold mb-3">What they do</h3>
               {company.videoLink && (
                 <div className="mb-6">
-                  <video 
-                    controls 
+                  <video
+                    controls
                     className="w-full rounded-lg"
                     poster={company.documents[0]}
                   >
@@ -360,7 +371,7 @@ export default function BidPage() {
                     placeholder="Enter amount"
                     className="w-full bg-transparent border border-[#333333] rounded-md p-2 text-white placeholder-gray-500 focus:outline-none focus:border-white"
                     value={bidDetails.amount}
-                    onChange={(e) => setBidDetails({...bidDetails, amount: e.target.value})}
+                    onChange={(e) => setBidDetails({ ...bidDetails, amount: e.target.value })}
                     required
                     disabled={isSubmitting}
                   />
@@ -375,7 +386,7 @@ export default function BidPage() {
                     placeholder="Enter rate"
                     className="w-full bg-transparent border border-[#333333] rounded-md p-2 text-white placeholder-gray-500 focus:outline-none focus:border-white"
                     value={bidDetails.interestRate}
-                    onChange={(e) => setBidDetails({...bidDetails, interestRate: e.target.value})}
+                    onChange={(e) => setBidDetails({ ...bidDetails, interestRate: e.target.value })}
                     required
                     disabled={isSubmitting}
                   />
@@ -390,7 +401,7 @@ export default function BidPage() {
                     placeholder="Enter tenure"
                     className="w-full bg-transparent border border-[#333333] rounded-md p-2 text-white placeholder-gray-500 focus:outline-none focus:border-white"
                     value={bidDetails.tenure}
-                    onChange={(e) => setBidDetails({...bidDetails, tenure: e.target.value})}
+                    onChange={(e) => setBidDetails({ ...bidDetails, tenure: e.target.value })}
                     required
                     disabled={isSubmitting}
                   />
@@ -404,12 +415,12 @@ export default function BidPage() {
                     placeholder="Any additional information..."
                     className="w-full bg-transparent border border-[#333333] rounded-md p-2 text-white placeholder-gray-500 focus:outline-none focus:border-white min-h-[100px] resize-none"
                     value={bidDetails.additionalDetails}
-                    onChange={(e) => setBidDetails({...bidDetails, additionalDetails: e.target.value})}
+                    onChange={(e) => setBidDetails({ ...bidDetails, additionalDetails: e.target.value })}
                     disabled={isSubmitting}
                   />
                 </div>
 
-                <Button 
+                <Button
                   type="submit"
                   className="w-full bg-white text-black hover:bg-gray-200 py-6 text-lg mt-6"
                   disabled={isSubmitting}
